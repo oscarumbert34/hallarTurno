@@ -1,0 +1,82 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-create-businesses
+      author: turnero
+      comment: Create businesses owned by authenticated users.
+      changes:
+        - createTable:
+            tableName: businesses
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_businesses
+                    nullable: false
+              - column:
+                  name: owner_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: short_description
+                  type: varchar(500)
+              - column:
+                  name: phone
+                  type: varchar(40)
+              - column:
+                  name: contact_email
+                  type: varchar(320)
+              - column:
+                  name: slug
+                  type: varchar(180)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_businesses_slug
+              - column:
+                  name: status
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: businesses
+            indexName: idx_businesses_owner_id
+            columns:
+              - column:
+                  name: owner_id
+        - createIndex:
+            tableName: businesses
+            indexName: idx_businesses_status
+            columns:
+              - column:
+                  name: status
+        - sql:
+            dbms: postgresql
+            sql: ALTER TABLE businesses ADD CONSTRAINT ck_businesses_status CHECK (status IN ('ACTIVE', 'PENDING', 'SUSPENDED'))
+        - addForeignKeyConstraint:
+            baseTableName: businesses
+            baseColumnNames: owner_id
+            constraintName: fk_businesses_owner_id
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+      rollback:
+        - dropTable:
+            tableName: businesses

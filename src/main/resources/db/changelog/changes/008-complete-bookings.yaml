@@ -1,0 +1,162 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-complete-bookings
+      author: turnero
+      changes:
+        - addColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: business_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: customer_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: service_name_snapshot
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resource_name_snapshot
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: duration_minutes_snapshot
+                  type: int
+                  constraints:
+                    nullable: false
+              - column:
+                  name: price_snapshot
+                  type: numeric(12,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: currency_snapshot
+                  type: varchar(3)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cancelled_at
+                  type: timestamp with time zone
+              - column:
+                  name: cancelled_by
+                  type: uuid
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: bookings
+            indexName: idx_bookings_customer_id
+            columns:
+              - column:
+                  name: customer_id
+        - createIndex:
+            tableName: bookings
+            indexName: idx_bookings_business_id
+            columns:
+              - column:
+                  name: business_id
+        - addForeignKeyConstraint:
+            baseTableName: bookings
+            baseColumnNames: business_id
+            constraintName: fk_bookings_business_id
+            referencedTableName: businesses
+            referencedColumnNames: id
+        - addForeignKeyConstraint:
+            baseTableName: bookings
+            baseColumnNames: customer_id
+            constraintName: fk_bookings_customer_id
+            referencedTableName: users
+            referencedColumnNames: id
+        - addForeignKeyConstraint:
+            baseTableName: bookings
+            baseColumnNames: cancelled_by
+            constraintName: fk_bookings_cancelled_by
+            referencedTableName: users
+            referencedColumnNames: id
+        - sql:
+            sql: ALTER TABLE bookings DROP CONSTRAINT ck_bookings_status
+        - sql:
+            sql: ALTER TABLE bookings ADD CONSTRAINT ck_bookings_status CHECK (status IN ('PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'))
+        - sql:
+            sql: ALTER TABLE bookings ADD CONSTRAINT ck_bookings_duration_snapshot CHECK (duration_minutes_snapshot > 0)
+        - sql:
+            sql: ALTER TABLE bookings ADD CONSTRAINT ck_bookings_price_snapshot CHECK (price_snapshot >= 0)
+        - sql:
+            sql: CREATE EXTENSION IF NOT EXISTS btree_gist
+        - sql:
+            sql: ALTER TABLE bookings ADD CONSTRAINT ex_bookings_resource_active_overlap EXCLUDE USING gist (resource_id WITH =, tstzrange(starts_at, ends_at, '[)') WITH &&) WHERE (status IN ('PENDING', 'CONFIRMED'))
+      rollback:
+        - sql:
+            sql: ALTER TABLE bookings DROP CONSTRAINT IF EXISTS ex_bookings_resource_active_overlap
+        - sql:
+            sql: ALTER TABLE bookings DROP CONSTRAINT IF EXISTS ck_bookings_price_snapshot
+        - sql:
+            sql: ALTER TABLE bookings DROP CONSTRAINT IF EXISTS ck_bookings_duration_snapshot
+        - sql:
+            sql: ALTER TABLE bookings DROP CONSTRAINT IF EXISTS ck_bookings_status
+        - sql:
+            sql: ALTER TABLE bookings ADD CONSTRAINT ck_bookings_status CHECK (status IN ('PENDING', 'CONFIRMED', 'CANCELLED'))
+        - dropForeignKeyConstraint:
+            baseTableName: bookings
+            constraintName: fk_bookings_cancelled_by
+        - dropForeignKeyConstraint:
+            baseTableName: bookings
+            constraintName: fk_bookings_customer_id
+        - dropForeignKeyConstraint:
+            baseTableName: bookings
+            constraintName: fk_bookings_business_id
+        - dropIndex:
+            tableName: bookings
+            indexName: idx_bookings_business_id
+        - dropIndex:
+            tableName: bookings
+            indexName: idx_bookings_customer_id
+        - dropColumn:
+            tableName: bookings
+            columnName: updated_at
+        - dropColumn:
+            tableName: bookings
+            columnName: created_at
+        - dropColumn:
+            tableName: bookings
+            columnName: cancelled_by
+        - dropColumn:
+            tableName: bookings
+            columnName: cancelled_at
+        - dropColumn:
+            tableName: bookings
+            columnName: currency_snapshot
+        - dropColumn:
+            tableName: bookings
+            columnName: price_snapshot
+        - dropColumn:
+            tableName: bookings
+            columnName: duration_minutes_snapshot
+        - dropColumn:
+            tableName: bookings
+            columnName: resource_name_snapshot
+        - dropColumn:
+            tableName: bookings
+            columnName: service_name_snapshot
+        - dropColumn:
+            tableName: bookings
+            columnName: customer_id
+        - dropColumn:
+            tableName: bookings
+            columnName: business_id

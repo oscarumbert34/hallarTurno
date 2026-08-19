@@ -1,0 +1,84 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-create-users
+      author: turnero
+      comment: Create the minimal persistent identity model.
+      changes:
+        - createTable:
+            tableName: users
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_users
+                    nullable: false
+              - column:
+                  name: email
+                  type: varchar(320)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_users_email
+              - column:
+                  name: password_hash
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: users
+            indexName: idx_users_status
+            columns:
+              - column:
+                  name: status
+        - sql:
+            dbms: postgresql
+            sql: ALTER TABLE users ADD CONSTRAINT ck_users_status CHECK (status IN ('ACTIVE', 'BLOCKED', 'PENDING_VERIFICATION'))
+        - createTable:
+            tableName: user_roles
+            columns:
+              - column:
+                  name: user_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: user_roles
+            columnNames: user_id, role
+            constraintName: pk_user_roles
+        - sql:
+            dbms: postgresql
+            sql: ALTER TABLE user_roles ADD CONSTRAINT ck_user_roles_role CHECK (role IN ('CUSTOMER', 'BUSINESS', 'ADMIN'))
+        - addForeignKeyConstraint:
+            baseTableName: user_roles
+            baseColumnNames: user_id
+            constraintName: fk_user_roles_user_id
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+      rollback:
+        - dropTable:
+            tableName: user_roles
+        - dropTable:
+            tableName: users

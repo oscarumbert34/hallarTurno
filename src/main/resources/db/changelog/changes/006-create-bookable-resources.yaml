@@ -1,0 +1,216 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-create-bookable-resources
+      author: turnero
+      comment: Create bookable resources, working hours, service capabilities and absences.
+      changes:
+        - createTable:
+            tableName: bookable_resources
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_bookable_resources
+                    nullable: false
+              - column:
+                  name: branch_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: visible_name
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: type
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: bookable_resources
+            indexName: idx_bookable_resources_branch_id
+            columns:
+              - column:
+                  name: branch_id
+        - createIndex:
+            tableName: bookable_resources
+            indexName: idx_bookable_resources_status
+            columns:
+              - column:
+                  name: status
+        - sql:
+            dbms: postgresql
+            sql: ALTER TABLE bookable_resources ADD CONSTRAINT ck_bookable_resources_type CHECK (type IN ('EMPLOYEE', 'ROOM', 'EQUIPMENT'))
+        - sql:
+            dbms: postgresql
+            sql: ALTER TABLE bookable_resources ADD CONSTRAINT ck_bookable_resources_status CHECK (status IN ('ACTIVE', 'INACTIVE'))
+        - addForeignKeyConstraint:
+            baseTableName: bookable_resources
+            baseColumnNames: branch_id
+            constraintName: fk_bookable_resources_branch_id
+            referencedTableName: branches
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createTable:
+            tableName: bookable_resource_service_offerings
+            columns:
+              - column:
+                  name: resource_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: service_offering_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: bookable_resource_service_offerings
+            columnNames: resource_id, service_offering_id
+            constraintName: pk_bookable_resource_service_offerings
+        - createIndex:
+            tableName: bookable_resource_service_offerings
+            indexName: idx_bookable_resource_service_offerings_service
+            columns:
+              - column:
+                  name: service_offering_id
+        - addForeignKeyConstraint:
+            baseTableName: bookable_resource_service_offerings
+            baseColumnNames: resource_id
+            constraintName: fk_bookable_resource_service_offerings_resource_id
+            referencedTableName: bookable_resources
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: bookable_resource_service_offerings
+            baseColumnNames: service_offering_id
+            constraintName: fk_bookable_resource_service_offerings_service_id
+            referencedTableName: service_offerings
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createTable:
+            tableName: resource_working_intervals
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_resource_working_intervals
+                    nullable: false
+              - column:
+                  name: resource_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: day_of_week
+                  type: varchar(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: starts_at
+                  type: time
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ends_at
+                  type: time
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: resource_working_intervals
+            indexName: idx_resource_working_intervals_resource_day
+            columns:
+              - column:
+                  name: resource_id
+              - column:
+                  name: day_of_week
+        - sql:
+            dbms: postgresql
+            sql: ALTER TABLE resource_working_intervals ADD CONSTRAINT ck_resource_working_intervals_day CHECK (day_of_week IN ('MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'))
+        - sql:
+            dbms: postgresql
+            sql: ALTER TABLE resource_working_intervals ADD CONSTRAINT ck_resource_working_intervals_time CHECK (starts_at < ends_at)
+        - addForeignKeyConstraint:
+            baseTableName: resource_working_intervals
+            baseColumnNames: resource_id
+            constraintName: fk_resource_working_intervals_resource_id
+            referencedTableName: bookable_resources
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createTable:
+            tableName: resource_absences
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_resource_absences
+                    nullable: false
+              - column:
+                  name: resource_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: absence_date
+                  type: date
+                  constraints:
+                    nullable: false
+              - column:
+                  name: starts_at
+                  type: time
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ends_at
+                  type: time
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: resource_absences
+            indexName: idx_resource_absences_resource_date
+            columns:
+              - column:
+                  name: resource_id
+              - column:
+                  name: absence_date
+        - sql:
+            dbms: postgresql
+            sql: ALTER TABLE resource_absences ADD CONSTRAINT ck_resource_absences_time CHECK (starts_at < ends_at)
+        - addForeignKeyConstraint:
+            baseTableName: resource_absences
+            baseColumnNames: resource_id
+            constraintName: fk_resource_absences_resource_id
+            referencedTableName: bookable_resources
+            referencedColumnNames: id
+            onDelete: CASCADE
+      rollback:
+        - dropTable:
+            tableName: resource_absences
+        - dropTable:
+            tableName: resource_working_intervals
+        - dropTable:
+            tableName: bookable_resource_service_offerings
+        - dropTable:
+            tableName: bookable_resources

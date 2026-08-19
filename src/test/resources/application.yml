@@ -1,0 +1,3 @@
+jwt:
+  secret: test-secret-key-with-at-least-thirty-two-characters
+  access-token-expiration: PT15M

@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: turnero
+  jackson:
+    time-zone: UTC
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+      naming:
+        implicit-strategy: org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  datasource:
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_POOL_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_POOL_MAX_LIFETIME:1800000}
+      connection-init-sql: SET TIME ZONE 'UTC'
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+jwt:
+  access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:PT15M}
+
+business:
+  initial-status: ${BUSINESS_INITIAL_STATUS:ACTIVE}
+
+availability:
+  default-zone-id: ${AVAILABILITY_DEFAULT_ZONE_ID:America/Argentina/Buenos_Aires}
+  slot-granularity-minutes: ${AVAILABILITY_SLOT_GRANULARITY_MINUTES:15}
+
+app:
+  security:
+    cors:
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+      allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
+      allowed-headers: ${CORS_ALLOWED_HEADERS:Authorization,Content-Type}
+      exposed-headers: ${CORS_EXPOSED_HEADERS:Location}
+      allow-credentials: ${CORS_ALLOW_CREDENTIALS:false}

@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:turnero}
+    username: ${DB_USERNAME:turnero}
+    password: ${DB_PASSWORD:turnero}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+jwt:
+  secret: ${JWT_SECRET:local-development-secret-change-me-please-1234567890}
+
+app:
+  security:
+    cors:
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}

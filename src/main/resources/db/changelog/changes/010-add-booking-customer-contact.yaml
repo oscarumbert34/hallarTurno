@@ -1,0 +1,27 @@
+databaseChangeLog:
+  - changeSet:
+      id: 010-add-booking-customer-contact
+      author: turnero
+      changes:
+        - addColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: customer_name_snapshot
+                  type: varchar(120)
+                  defaultValue: Sin nombre
+                  constraints:
+                    nullable: false
+              - column:
+                  name: customer_phone_snapshot
+                  type: varchar(40)
+                  defaultValue: Sin telefono
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: bookings
+            columnName: customer_phone_snapshot
+        - dropColumn:
+            tableName: bookings
+            columnName: customer_name_snapshot

@@ -1,0 +1,109 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-create-bookings-and-branch-zone
+      author: turnero
+      changes:
+        - addColumn:
+            tableName: branches
+            columns:
+              - column:
+                  name: zone_id
+                  type: varchar(64)
+                  defaultValue: America/Argentina/Buenos_Aires
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: bookings
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: pk_bookings
+              - column:
+                  name: branch_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: service_offering_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resource_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: starts_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ends_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: bookings
+            indexName: idx_bookings_resource_time
+            columns:
+              - column:
+                  name: resource_id
+              - column:
+                  name: starts_at
+              - column:
+                  name: ends_at
+        - createIndex:
+            tableName: bookings
+            indexName: idx_bookings_branch_time
+            columns:
+              - column:
+                  name: branch_id
+              - column:
+                  name: starts_at
+              - column:
+                  name: ends_at
+        - createIndex:
+            tableName: bookings
+            indexName: idx_bookings_status
+            columns:
+              - column:
+                  name: status
+        - sql:
+            sql: ALTER TABLE bookings ADD CONSTRAINT ck_bookings_status CHECK (status IN ('PENDING', 'CONFIRMED', 'CANCELLED'))
+        - sql:
+            sql: ALTER TABLE bookings ADD CONSTRAINT ck_bookings_time CHECK (starts_at < ends_at)
+        - addForeignKeyConstraint:
+            baseTableName: bookings
+            baseColumnNames: branch_id
+            constraintName: fk_bookings_branch_id
+            referencedTableName: branches
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: bookings
+            baseColumnNames: service_offering_id
+            constraintName: fk_bookings_service_offering_id
+            referencedTableName: service_offerings
+            referencedColumnNames: id
+        - addForeignKeyConstraint:
+            baseTableName: bookings
+            baseColumnNames: resource_id
+            constraintName: fk_bookings_resource_id
+            referencedTableName: bookable_resources
+            referencedColumnNames: id
+      rollback:
+        - dropTable:
+            tableName: bookings
+        - dropColumn:
+            tableName: branches
+            columnName: zone_id

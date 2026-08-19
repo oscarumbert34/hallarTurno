@@ -1,0 +1,155 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-create-branches
+      author: turnero
+      comment: Create physical branches and weekly opening intervals.
+      changes:
+        - createTable:
+            tableName: branches
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_branches
+                    nullable: false
+              - column:
+                  name: business_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(160)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: address
+                  type: varchar(240)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: locality
+                  type: varchar(120)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: province
+                  type: varchar(120)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: country
+                  type: varchar(120)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: latitude
+                  type: numeric(10,7)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: longitude
+                  type: numeric(10,7)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: branches
+            indexName: idx_branches_business_id
+            columns:
+              - column:
+                  name: business_id
+        - createIndex:
+            tableName: branches
+            indexName: idx_branches_status
+            columns:
+              - column:
+                  name: status
+        - sql:
+            dbms: postgresql
+            sql: ALTER TABLE branches ADD CONSTRAINT ck_branches_status CHECK (status IN ('ACTIVE', 'INACTIVE'))
+        - sql:
+            dbms: postgresql
+            sql: ALTER TABLE branches ADD CONSTRAINT ck_branches_latitude CHECK (latitude >= -90 AND latitude <= 90)
+        - sql:
+            dbms: postgresql
+            sql: ALTER TABLE branches ADD CONSTRAINT ck_branches_longitude CHECK (longitude >= -180 AND longitude <= 180)
+        - addForeignKeyConstraint:
+            baseTableName: branches
+            baseColumnNames: business_id
+            constraintName: fk_branches_business_id
+            referencedTableName: businesses
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createTable:
+            tableName: branch_opening_intervals
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_branch_opening_intervals
+                    nullable: false
+              - column:
+                  name: branch_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: day_of_week
+                  type: varchar(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: opens_at
+                  type: time
+                  constraints:
+                    nullable: false
+              - column:
+                  name: closes_at
+                  type: time
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: branch_opening_intervals
+            indexName: idx_branch_opening_intervals_branch_day
+            columns:
+              - column:
+                  name: branch_id
+              - column:
+                  name: day_of_week
+        - sql:
+            dbms: postgresql
+            sql: ALTER TABLE branch_opening_intervals ADD CONSTRAINT ck_branch_opening_intervals_day CHECK (day_of_week IN ('MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'))
+        - sql:
+            dbms: postgresql
+            sql: ALTER TABLE branch_opening_intervals ADD CONSTRAINT ck_branch_opening_intervals_time CHECK (opens_at < closes_at)
+        - addForeignKeyConstraint:
+            baseTableName: branch_opening_intervals
+            baseColumnNames: branch_id
+            constraintName: fk_branch_opening_intervals_branch_id
+            referencedTableName: branches
+            referencedColumnNames: id
+            onDelete: CASCADE
+      rollback:
+        - dropTable:
+            tableName: branch_opening_intervals
+        - dropTable:
+            tableName: branches

@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-allow-public-bookings
+      author: turnero
+      changes:
+        - dropNotNullConstraint:
+            tableName: bookings
+            columnName: customer_id
+            columnDataType: uuid
+      rollback:
+        - addNotNullConstraint:
+            tableName: bookings
+            columnName: customer_id
+            columnDataType: uuid
