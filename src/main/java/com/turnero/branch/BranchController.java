@@ -61,6 +61,16 @@ public class BranchController {
         return branchService.update(id, request, currentUser);
     }
 
+    @PutMapping("/businesses/{businessId}/branches/{id}")
+    BranchResponse updateForBusiness(
+            @PathVariable UUID businessId,
+            @PathVariable UUID id,
+            @Valid @RequestBody BranchRequest request,
+            @AuthenticationPrincipal AuthenticatedUser currentUser
+    ) {
+        return branchService.update(businessId, id, request, currentUser);
+    }
+
     @DeleteMapping("/branches/{id}")
     ResponseEntity<Void> delete(
             @PathVariable UUID id,

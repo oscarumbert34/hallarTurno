@@ -9,6 +9,7 @@ public record PublicAvailabilityPageResponse(
         int limit,
         long totalElements,
         int totalPages,
+        int totalMatchingServices,
         int totalAvailableSlots,
         boolean hasMore,
         List<PublicAvailabilityBusinessResponse> results

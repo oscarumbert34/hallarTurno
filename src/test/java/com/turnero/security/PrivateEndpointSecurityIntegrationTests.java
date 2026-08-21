@@ -178,6 +178,15 @@ class PrivateEndpointSecurityIntegrationTests {
                         .content("{}"))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void publicAvailabilitySlotsEndpointDoesNotRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/api/v1/public/availability/" + UUID.randomUUID() + "/slots")
+                        .param("branchId", UUID.randomUUID().toString())
+                        .param("date", "2026-09-07"))
+                .andExpect(status().isNotFound());
+    }
+
     @Test
     void corsPreflightUsesConfiguredOriginWithoutWildcardCredentials() throws Exception {
         mockMvc.perform(options("/api/v1/public/availability")

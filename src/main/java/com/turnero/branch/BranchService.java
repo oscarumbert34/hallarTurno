@@ -78,6 +78,19 @@ public class BranchService {
     @Transactional
     public BranchResponse update(UUID id, BranchRequest request, AuthenticatedUser currentUser) {
         Branch branch = findBranch(id);
+        return update(branch, request, currentUser);
+    }
+
+    @Transactional
+    public BranchResponse update(UUID businessId, UUID id, BranchRequest request, AuthenticatedUser currentUser) {
+        Branch branch = findBranch(id);
+        if (!branch.getBusiness().getId().equals(businessId)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "Branch not found");
+        }
+        return update(branch, request, currentUser);
+    }
+
+    private BranchResponse update(Branch branch, BranchRequest request, AuthenticatedUser currentUser) {
         assertOwnerOrAdmin(branch.getBusiness(), currentUser);
         branch.updateDetails(
                 request.name().trim(),

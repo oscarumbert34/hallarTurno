@@ -130,22 +130,23 @@ class PublicAvailabilityControllerIntegrationTests {
     }
 
     @Test
-    void searchPaginatesAvailabilitySlotsKeepingCurrentOrder() throws Exception {
+    void searchLimitsAvailabilitySlotsPerServiceKeepingCurrentOrder() throws Exception {
         Fixture fixture = fixture("market-slot-pagination", "Corte agenda", "Caballito", "ACTIVE", "ACTIVE", true);
 
         JsonNode response = search("/api/v1/public/availability?date=2026-09-07&businessId="
-                + fixture.businessId() + "&offset=1&limit=2");
+                + fixture.businessId() + "&offset=0&limit=10&maxSlotsPerService=2");
 
-        assertThat(response.get("offset").asInt()).isEqualTo(1);
-        assertThat(response.get("limit").asInt()).isEqualTo(2);
+        assertThat(response.get("offset").asInt()).isEqualTo(0);
+        assertThat(response.get("limit").asInt()).isEqualTo(10);
+        assertThat(response.get("totalMatchingServices").asInt()).isEqualTo(1);
         assertThat(response.get("totalAvailableSlots").asInt()).isEqualTo(4);
-        assertThat(response.get("hasMore").asBoolean()).isTrue();
+        assertThat(response.get("hasMore").asBoolean()).isFalse();
         assertThat(slotStarts(response.at("/results/0/branches/0/services/0/slots")))
-                .containsExactly("09:30:00", "10:00:00");
+                .containsExactly("09:00:00", "09:30:00");
     }
 
     @Test
-    void searchReturnsEveryMatchingServiceWhenSlotLimitIsReached() throws Exception {
+    void searchPaginatesMatchingServicesAndLimitsSlotsPerService() throws Exception {
         Fixture fixture = fixture("market-multiple-services", "Sesion psiquiatrica", "Nuñez", "ACTIVE", "ACTIVE", true);
         String secondOfferingId = createOffering(
                 fixture.ownerToken(),
@@ -156,7 +157,7 @@ class PublicAvailabilityControllerIntegrationTests {
         );
         createResource(fixture.ownerToken(), fixture.branchId(), "Recurso market-multiple-services-2", secondOfferingId);
 
-        JsonNode response = search("/api/v1/public/availability?date=2026-09-07&service=sesion&locality=Nuñez&offset=0&limit=2&businessId="
+        JsonNode response = search("/api/v1/public/availability?date=2026-09-07&service=sesion&locality=Nuñez&offset=0&limit=2&maxSlotsPerService=2&businessId="
                 + fixture.businessId());
 
         JsonNode services = response.at("/results/0/branches/0/services");
@@ -164,15 +165,44 @@ class PublicAvailabilityControllerIntegrationTests {
         assertThat(serviceNames(services)).containsExactly("Sesion psicologica", "Sesion psiquiatrica");
         assertThat(services.get(0).get("slots")).hasSize(2);
         assertThat(services.get(1).get("slots")).hasSize(2);
+        assertThat(response.get("totalMatchingServices").asInt()).isEqualTo(2);
         assertThat(response.get("totalAvailableSlots").asInt()).isEqualTo(8);
-        assertThat(response.get("hasMore").asBoolean()).isTrue();
+        assertThat(response.get("hasMore").asBoolean()).isFalse();
+    }
+
+    @Test
+    void serviceSlotsEndpointPaginatesSlotsForOneService() throws Exception {
+        Fixture fixture = fixture("market-service-slots", "Sesion psiquiatrica", "Flores", "ACTIVE", "ACTIVE", true);
+
+        JsonNode response = search("/api/v1/public/availability/" + fixture.serviceOfferingId()
+                + "/slots?date=2026-09-07&branchId=" + fixture.branchId()
+                + "&startsFrom=09:00&startsTo=11:00&offset=2&limit=2");
+
+        assertThat(response.get("serviceOfferingId").asText()).isEqualTo(fixture.serviceOfferingId());
+        assertThat(response.get("branchId").asText()).isEqualTo(fixture.branchId());
+        assertThat(response.get("offset").asInt()).isEqualTo(2);
+        assertThat(response.get("limit").asInt()).isEqualTo(2);
+        assertThat(response.get("totalAvailableSlots").asInt()).isEqualTo(4);
+        assertThat(response.get("hasMore").asBoolean()).isFalse();
+        assertThat(slotStarts(response.get("slots"))).containsExactly("10:00:00", "10:30:00");
     }
 
     @Test
     void searchRejectsAvailabilityLimitAboveMaximum() throws Exception {
         mockMvc.perform(get("/api/v1/public/availability")
                         .param("date", "2026-09-07")
-                        .param("limit", "51"))
+                        .param("limit", "11"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void serviceSlotsEndpointRejectsLimitAboveMaximum() throws Exception {
+        Fixture fixture = fixture("market-service-slots-limit", "Sesion psiquiatrica", "Flores", "ACTIVE", "ACTIVE", true);
+
+        mockMvc.perform(get("/api/v1/public/availability/" + fixture.serviceOfferingId() + "/slots")
+                        .param("date", "2026-09-07")
+                        .param("branchId", fixture.branchId())
+                        .param("limit", "11"))
                 .andExpect(status().isBadRequest());
     }
 

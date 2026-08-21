@@ -32,7 +32,9 @@ public class PublicAvailabilityService {
     private static final int DEFAULT_SIZE = 10;
     private static final int MAX_SIZE = 50;
     private static final int DEFAULT_LIMIT = 10;
-    private static final int MAX_LIMIT = 50;
+    private static final int MAX_LIMIT = 10;
+    private static final int DEFAULT_MAX_SLOTS_PER_SERVICE = 10;
+    private static final int MAX_SLOTS_PER_SERVICE = 10;
 
     private final ServiceOfferingRepository serviceOfferingRepository;
     private final BusinessRepository businessRepository;
@@ -75,9 +77,14 @@ public class PublicAvailabilityService {
         int normalizedSize = normalizePositive(size, DEFAULT_SIZE, MAX_SIZE);
         int normalizedOffset = Math.max(offset, 0);
         int normalizedLimit = normalizePositive(
-                limit == null ? maxSlotsPerService : limit,
+                limit == null ? DEFAULT_LIMIT : limit,
                 DEFAULT_LIMIT,
                 MAX_LIMIT
+        );
+        int normalizedMaxSlots = normalizePositive(
+                maxSlotsPerService,
+                DEFAULT_MAX_SLOTS_PER_SERVICE,
+                MAX_SLOTS_PER_SERVICE
         );
 
         String textPattern = normalizedText == null ? "" : "%" + normalizedText + "%";
@@ -106,9 +113,8 @@ public class PublicAvailabilityService {
                 );
 
         Map<UUID, List<Branch>> branchesByBusiness = findBranchesByBusiness(businessIds, normalizedLocality);
-        Map<UUID, BusinessGroup> businessGroups = new LinkedHashMap<>();
+        List<ServiceAvailabilityOption> serviceOptions = new java.util.ArrayList<>();
         int totalAvailableSlots = 0;
-        boolean hasMore = false;
 
         for (ServiceOffering offering : offerings) {
             List<Branch> candidateBranches = candidateBranches(offering, branchesByBusiness, normalizedLocality);
@@ -119,18 +125,30 @@ public class PublicAvailabilityService {
                         .filter(slot -> withinRequestedRange(slot, startsFrom, startsTo))
                         .toList();
                 totalAvailableSlots += slots.size();
-                int toIndex = (int) Math.min(slots.size(), (long) normalizedOffset + normalizedLimit);
-                if (toIndex < slots.size()) {
-                    hasMore = true;
-                }
-                if (normalizedOffset >= slots.size()) {
+                if (slots.isEmpty()) {
                     continue;
                 }
-                slots.subList(normalizedOffset, toIndex).stream()
-                        .map(this::toPublicSlot)
-                        .forEach(slot -> addResult(businessGroups, offering, branch, slot));
+                serviceOptions.add(new ServiceAvailabilityOption(offering, branch, slots));
             }
         }
+
+        int totalMatchingServices = serviceOptions.size();
+        int toIndex = (int) Math.min(totalMatchingServices, (long) normalizedOffset + normalizedLimit);
+        List<ServiceAvailabilityOption> paginatedServices = normalizedOffset >= totalMatchingServices
+                ? List.of()
+                : serviceOptions.subList(normalizedOffset, toIndex);
+        Map<UUID, BusinessGroup> businessGroups = new LinkedHashMap<>();
+        paginatedServices.forEach(serviceOption ->
+                serviceOption.slots().stream()
+                        .limit(normalizedMaxSlots)
+                        .map(this::toPublicSlot)
+                        .forEach(slot -> addResult(
+                                businessGroups,
+                                serviceOption.offering(),
+                                serviceOption.branch(),
+                                slot
+                        ))
+        );
 
         return new PublicAvailabilityPageResponse(
                 normalizedPage,
@@ -139,9 +157,53 @@ public class PublicAvailabilityService {
                 normalizedLimit,
                 businesses.getTotalElements(),
                 businesses.getTotalPages(),
+                totalMatchingServices,
                 totalAvailableSlots,
-                hasMore,
+                toIndex < totalMatchingServices,
                 businessGroups.values().stream().map(BusinessGroup::toResponse).toList()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public PublicAvailabilitySlotsPageResponse findSlots(
+            UUID serviceOfferingId,
+            UUID branchId,
+            LocalDate date,
+            LocalTime startsFrom,
+            LocalTime startsTo,
+            int offset,
+            int limit
+    ) {
+        if (date == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Availability date is required");
+        }
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Branch not found"));
+        ServiceOffering offering = serviceOfferingRepository.findById(serviceOfferingId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Service offering not found"));
+        assertPublicAvailabilityCandidate(offering, branch);
+
+        int normalizedOffset = Math.max(offset, 0);
+        int normalizedLimit = normalizePositive(limit, DEFAULT_LIMIT, MAX_LIMIT);
+        List<PublicAvailabilitySlotResponse> slots = availabilityService
+                .findAvailableSlots(branchId, serviceOfferingId, date)
+                .stream()
+                .filter(slot -> withinRequestedRange(slot, startsFrom, startsTo))
+                .map(this::toPublicSlot)
+                .toList();
+        int toIndex = (int) Math.min(slots.size(), (long) normalizedOffset + normalizedLimit);
+        List<PublicAvailabilitySlotResponse> paginatedSlots = normalizedOffset >= slots.size()
+                ? List.of()
+                : slots.subList(normalizedOffset, toIndex);
+
+        return new PublicAvailabilitySlotsPageResponse(
+                serviceOfferingId,
+                branchId,
+                normalizedOffset,
+                normalizedLimit,
+                slots.size(),
+                toIndex < slots.size(),
+                paginatedSlots
         );
     }
 
@@ -180,6 +242,20 @@ public class PublicAvailabilityService {
     ) {
         return (startsFrom == null || !slot.startsAt().isBefore(startsFrom))
                 && (startsTo == null || !slot.startsAt().isAfter(startsTo));
+    }
+
+    private void assertPublicAvailabilityCandidate(ServiceOffering offering, Branch branch) {
+        if (offering.getStatus() != ServiceOfferingStatus.ACTIVE
+                || offering.getBusiness().getStatus() != BusinessStatus.ACTIVE
+                || branch.getStatus() != BranchStatus.ACTIVE) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "Availability target not found");
+        }
+        if (!branch.getBusiness().getId().equals(offering.getBusiness().getId())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Service offering does not belong to the branch business");
+        }
+        if (offering.getBranch() != null && !offering.getBranch().getId().equals(branch.getId())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Branch-specific service offering does not belong to the branch");
+        }
     }
 
     private void addResult(
@@ -234,6 +310,13 @@ public class PublicAvailabilityService {
             return defaultValue;
         }
         return Math.min(requested, maxValue);
+    }
+
+    private record ServiceAvailabilityOption(
+            ServiceOffering offering,
+            Branch branch,
+            List<AvailabilitySlotResponse> slots
+    ) {
     }
 
     private static class ServiceGroup {

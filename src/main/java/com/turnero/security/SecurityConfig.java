@@ -40,7 +40,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/public/bookings").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/businesses").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/businesses/*/service-offerings").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/public/availability").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/public/availability", "/api/v1/public/availability/*/slots").permitAll()
                         .anyRequest().authenticated())
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)

@@ -159,6 +159,23 @@ class BranchControllerIntegrationTests {
                 .andExpect(jsonPath("$.name").value("Sucursal Nueva"))
                 .andExpect(jsonPath("$.weeklySchedule[2].intervals[0].opensAt").value("10:00:00"));
 
+        mockMvc.perform(put("/api/v1/businesses/" + businessId + "/branches/" + branchId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(branchJson("Sucursal Ruta Anidada", """
+                                [
+                                  {
+                                    "dayOfWeek": "THURSDAY",
+                                    "intervals": [
+                                      {"opensAt": "11:00", "closesAt": "17:00"}
+                                    ]
+                                  }
+                                ]
+                                """)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Sucursal Ruta Anidada"))
+                .andExpect(jsonPath("$.weeklySchedule[3].intervals[0].opensAt").value("11:00:00"));
+
         mockMvc.perform(delete("/api/v1/branches/" + branchId)
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
