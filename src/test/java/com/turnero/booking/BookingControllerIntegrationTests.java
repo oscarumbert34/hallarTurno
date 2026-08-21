@@ -145,10 +145,10 @@ class BookingControllerIntegrationTests {
     @Test
     void businessBookingListFiltersByRequestedLocalDate() throws Exception {
         Fixture fixture = fixture("booking-date-filter");
-        String currentDayBookingId = createBooking(fixture.customerToken(), fixture, "2026-09-07", "09:00");
-        String futureBookingId = createBooking(fixture.customerToken(), fixture, "2026-09-14", "09:30");
+        String currentDayBookingId = createBooking(fixture.customerToken(), fixture, "2026-08-21", "09:00");
+        String futureBookingId = createBooking(fixture.customerToken(), fixture, "2026-08-27", "09:30");
 
-        mockMvc.perform(get("/api/v1/businesses/" + fixture.businessId() + "/bookings?date=2026-09-07")
+        mockMvc.perform(get("/api/v1/businesses/" + fixture.businessId() + "/bookings?date=2026-08-21")
                         .header("Authorization", "Bearer " + fixture.ownerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
@@ -285,6 +285,18 @@ class BookingControllerIntegrationTests {
                                       "intervals": [
                                         {"opensAt": "09:00", "closesAt": "12:00"}
                                       ]
+                                    },
+                                    {
+                                      "dayOfWeek": "THURSDAY",
+                                      "intervals": [
+                                        {"opensAt": "09:00", "closesAt": "12:00"}
+                                      ]
+                                    },
+                                    {
+                                      "dayOfWeek": "FRIDAY",
+                                      "intervals": [
+                                        {"opensAt": "09:00", "closesAt": "12:00"}
+                                      ]
                                     }
                                   ]
                                 }
@@ -329,6 +341,18 @@ class BookingControllerIntegrationTests {
                                   "weeklySchedule": [
                                     {
                                       "dayOfWeek": "MONDAY",
+                                      "intervals": [
+                                        {"startsAt": "09:00", "endsAt": "12:00"}
+                                      ]
+                                    },
+                                    {
+                                      "dayOfWeek": "THURSDAY",
+                                      "intervals": [
+                                        {"startsAt": "09:00", "endsAt": "12:00"}
+                                      ]
+                                    },
+                                    {
+                                      "dayOfWeek": "FRIDAY",
                                       "intervals": [
                                         {"startsAt": "09:00", "endsAt": "12:00"}
                                       ]
