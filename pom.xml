@@ -13,7 +13,7 @@
 
     <groupId>com.turnero</groupId>
     <artifactId>turnero</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.2-SNAPSHOT</version>
     <name>turnero</name>
     <description>Backend base para Turnero</description>
 
