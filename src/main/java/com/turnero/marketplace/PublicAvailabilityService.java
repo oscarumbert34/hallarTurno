@@ -106,32 +106,31 @@ public class PublicAvailabilityService {
                 );
 
         Map<UUID, List<Branch>> branchesByBusiness = findBranchesByBusiness(businessIds, normalizedLocality);
-        List<SlotOption> slotOptions = new java.util.ArrayList<>();
+        Map<UUID, BusinessGroup> businessGroups = new LinkedHashMap<>();
+        int totalAvailableSlots = 0;
+        boolean hasMore = false;
 
         for (ServiceOffering offering : offerings) {
             List<Branch> candidateBranches = candidateBranches(offering, branchesByBusiness, normalizedLocality);
             for (Branch branch : candidateBranches) {
-                availabilityService
+                List<AvailabilitySlotResponse> slots = availabilityService
                         .findAvailableSlots(branch.getId(), offering.getId(), date)
                         .stream()
                         .filter(slot -> withinRequestedRange(slot, startsFrom, startsTo))
-                        .map(slot -> new SlotOption(offering, branch, slot))
-                        .forEach(slotOptions::add);
+                        .toList();
+                totalAvailableSlots += slots.size();
+                int toIndex = (int) Math.min(slots.size(), (long) normalizedOffset + normalizedLimit);
+                if (toIndex < slots.size()) {
+                    hasMore = true;
+                }
+                if (normalizedOffset >= slots.size()) {
+                    continue;
+                }
+                slots.subList(normalizedOffset, toIndex).stream()
+                        .map(this::toPublicSlot)
+                        .forEach(slot -> addResult(businessGroups, offering, branch, slot));
             }
         }
-
-        int totalAvailableSlots = slotOptions.size();
-        int toIndex = (int) Math.min(totalAvailableSlots, (long) normalizedOffset + normalizedLimit);
-        List<SlotOption> paginatedSlots = normalizedOffset >= totalAvailableSlots
-                ? List.of()
-                : slotOptions.subList(normalizedOffset, toIndex);
-        Map<UUID, BusinessGroup> businessGroups = new LinkedHashMap<>();
-        paginatedSlots.forEach(slotOption -> addResult(
-                businessGroups,
-                slotOption.offering(),
-                slotOption.branch(),
-                toPublicSlot(slotOption.slot())
-        ));
 
         return new PublicAvailabilityPageResponse(
                 normalizedPage,
@@ -141,7 +140,7 @@ public class PublicAvailabilityService {
                 businesses.getTotalElements(),
                 businesses.getTotalPages(),
                 totalAvailableSlots,
-                toIndex < totalAvailableSlots,
+                hasMore,
                 businessGroups.values().stream().map(BusinessGroup::toResponse).toList()
         );
     }
@@ -235,13 +234,6 @@ public class PublicAvailabilityService {
             return defaultValue;
         }
         return Math.min(requested, maxValue);
-    }
-
-    private record SlotOption(
-            ServiceOffering offering,
-            Branch branch,
-            AvailabilitySlotResponse slot
-    ) {
     }
 
     private static class ServiceGroup {

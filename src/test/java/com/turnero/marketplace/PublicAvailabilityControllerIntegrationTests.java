@@ -145,6 +145,30 @@ class PublicAvailabilityControllerIntegrationTests {
     }
 
     @Test
+    void searchReturnsEveryMatchingServiceWhenSlotLimitIsReached() throws Exception {
+        Fixture fixture = fixture("market-multiple-services", "Sesion psiquiatrica", "Nuñez", "ACTIVE", "ACTIVE", true);
+        String secondOfferingId = createOffering(
+                fixture.ownerToken(),
+                fixture.businessId(),
+                fixture.branchId(),
+                "Sesion psicologica",
+                "ACTIVE"
+        );
+        createResource(fixture.ownerToken(), fixture.branchId(), "Recurso market-multiple-services-2", secondOfferingId);
+
+        JsonNode response = search("/api/v1/public/availability?date=2026-09-07&service=sesion&locality=Nuñez&offset=0&limit=2&businessId="
+                + fixture.businessId());
+
+        JsonNode services = response.at("/results/0/branches/0/services");
+        assertThat(services).hasSize(2);
+        assertThat(serviceNames(services)).containsExactly("Sesion psicologica", "Sesion psiquiatrica");
+        assertThat(services.get(0).get("slots")).hasSize(2);
+        assertThat(services.get(1).get("slots")).hasSize(2);
+        assertThat(response.get("totalAvailableSlots").asInt()).isEqualTo(8);
+        assertThat(response.get("hasMore").asBoolean()).isTrue();
+    }
+
+    @Test
     void searchRejectsAvailabilityLimitAboveMaximum() throws Exception {
         mockMvc.perform(get("/api/v1/public/availability")
                         .param("date", "2026-09-07")
@@ -186,7 +210,7 @@ class PublicAvailabilityControllerIntegrationTests {
         String resourceId = createResource
                 ? createResource(ownerToken, branchId, "Recurso " + prefix, serviceOfferingId)
                 : null;
-        return new Fixture(businessId, branchId, serviceOfferingId, resourceId);
+        return new Fixture(ownerToken, businessId, branchId, serviceOfferingId, resourceId);
     }
 
     private String registerAndGetToken(String email, String role) throws Exception {
@@ -342,7 +366,14 @@ class PublicAvailabilityControllerIntegrationTests {
         return starts;
     }
 
+    private List<String> serviceNames(JsonNode services) {
+        List<String> names = new ArrayList<>();
+        services.forEach(service -> names.add(service.get("name").asText()));
+        return names;
+    }
+
     private record Fixture(
+            String ownerToken,
             String businessId,
             String branchId,
             String serviceOfferingId,
