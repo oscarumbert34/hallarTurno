@@ -103,6 +103,20 @@ class PublicAvailabilityControllerIntegrationTests {
     }
 
     @Test
+    void searchServiceNameIgnoresCaseAndAccents() throws Exception {
+        Fixture accentedService = fixture("market-accented-service", "MÁSÁJE relax", "Almagro", "ACTIVE", "ACTIVE", true);
+        Fixture plainService = fixture("market-plain-service", "Masaje descontracturante", "Villa Crespo", "ACTIVE", "ACTIVE", true);
+
+        JsonNode unaccentedSearch = search("/api/v1/public/availability?date=2026-09-07&service=masaje&locality=Almagro");
+        JsonNode accentedSearch = search("/api/v1/public/availability?date=2026-09-07&service=másaje&locality=Villa%20Crespo");
+
+        assertThat(unaccentedSearch.get("results")).hasSize(1);
+        assertThat(unaccentedSearch.at("/results/0/id").asText()).isEqualTo(accentedService.businessId());
+        assertThat(accentedSearch.get("results")).hasSize(1);
+        assertThat(accentedSearch.at("/results/0/id").asText()).isEqualTo(plainService.businessId());
+    }
+
+    @Test
     void searchCanBeFilteredByBusinessId() throws Exception {
         Fixture requestedBusiness = fixture("market-business-filter", "Corte clasico", "Chacarita", "ACTIVE", "ACTIVE", true);
         Fixture otherBusiness = fixture("market-business-filter-other", "Corte premium", "Chacarita", "ACTIVE", "ACTIVE", true);
@@ -113,6 +127,29 @@ class PublicAvailabilityControllerIntegrationTests {
         assertThat(response.get("results")).hasSize(1);
         assertThat(response.at("/results/0/id").asText()).isEqualTo(requestedBusiness.businessId());
         assertThat(response.toString()).doesNotContain(otherBusiness.businessId());
+    }
+
+    @Test
+    void searchPaginatesAvailabilitySlotsKeepingCurrentOrder() throws Exception {
+        Fixture fixture = fixture("market-slot-pagination", "Corte agenda", "Caballito", "ACTIVE", "ACTIVE", true);
+
+        JsonNode response = search("/api/v1/public/availability?date=2026-09-07&businessId="
+                + fixture.businessId() + "&offset=1&limit=2");
+
+        assertThat(response.get("offset").asInt()).isEqualTo(1);
+        assertThat(response.get("limit").asInt()).isEqualTo(2);
+        assertThat(response.get("totalAvailableSlots").asInt()).isEqualTo(4);
+        assertThat(response.get("hasMore").asBoolean()).isTrue();
+        assertThat(slotStarts(response.at("/results/0/branches/0/services/0/slots")))
+                .containsExactly("09:30:00", "10:00:00");
+    }
+
+    @Test
+    void searchRejectsAvailabilityLimitAboveMaximum() throws Exception {
+        mockMvc.perform(get("/api/v1/public/availability")
+                        .param("date", "2026-09-07")
+                        .param("limit", "51"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

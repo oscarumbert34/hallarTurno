@@ -38,5 +38,20 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             "resource",
             "cancelledBy"
     })
-    Page<Booking> findByBusinessIdOrderByStartsAtDesc(UUID businessId, Pageable pageable);
+    Page<Booking> findByBusinessIdOrderByStartsAtAscIdAsc(UUID businessId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+            "business",
+            "business.owner",
+            "customer",
+            "branch",
+            "serviceOffering",
+            "resource",
+            "cancelledBy"
+    })
+    List<Booking> findByBusinessIdAndStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAscIdAsc(
+            UUID businessId,
+            Instant startsAtFrom,
+            Instant startsAtTo
+    );
 }

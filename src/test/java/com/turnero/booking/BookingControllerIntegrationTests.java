@@ -114,10 +114,10 @@ class BookingControllerIntegrationTests {
                 .andExpect(jsonPath("$.size").value(20))
                 .andExpect(jsonPath("$.totalElements").value(2))
                 .andExpect(jsonPath("$.results.length()").value(2))
-                .andExpect(jsonPath("$.results[0].id").value(secondBookingId))
+                .andExpect(jsonPath("$.results[0].id").value(firstBookingId))
                 .andExpect(jsonPath("$.results[0].customerName").value("Cliente " + fixture.prefix()))
                 .andExpect(jsonPath("$.results[0].customerPhone").value("+54 11 5555-1234"))
-                .andExpect(jsonPath("$.results[1].id").value(firstBookingId));
+                .andExpect(jsonPath("$.results[1].id").value(secondBookingId));
 
         mockMvc.perform(get("/api/v1/businesses/" + fixture.businessId() + "/bookings")
                         .header("Authorization", "Bearer " + otherOwnerToken))
@@ -128,8 +128,8 @@ class BookingControllerIntegrationTests {
     @Test
     void businessBookingListSupportsPagination() throws Exception {
         Fixture fixture = fixture("booking-page");
-        createBooking(fixture.customerToken(), fixture, "09:00");
-        String secondBookingId = createBooking(fixture.customerToken(), fixture, "09:30");
+        String firstBookingId = createBooking(fixture.customerToken(), fixture, "09:00");
+        createBooking(fixture.customerToken(), fixture, "09:30");
 
         mockMvc.perform(get("/api/v1/businesses/" + fixture.businessId() + "/bookings?page=0&size=1")
                         .header("Authorization", "Bearer " + fixture.ownerToken()))
@@ -139,7 +139,23 @@ class BookingControllerIntegrationTests {
                 .andExpect(jsonPath("$.totalElements").value(2))
                 .andExpect(jsonPath("$.totalPages").value(2))
                 .andExpect(jsonPath("$.results.length()").value(1))
-                .andExpect(jsonPath("$.results[0].id").value(secondBookingId));
+                .andExpect(jsonPath("$.results[0].id").value(firstBookingId));
+    }
+
+    @Test
+    void businessBookingListFiltersByRequestedLocalDate() throws Exception {
+        Fixture fixture = fixture("booking-date-filter");
+        String currentDayBookingId = createBooking(fixture.customerToken(), fixture, "2026-09-07", "09:00");
+        String futureBookingId = createBooking(fixture.customerToken(), fixture, "2026-09-14", "09:30");
+
+        mockMvc.perform(get("/api/v1/businesses/" + fixture.businessId() + "/bookings?date=2026-09-07")
+                        .header("Authorization", "Bearer " + fixture.ownerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.results.length()").value(1))
+                .andExpect(jsonPath("$.results[0].id").value(currentDayBookingId));
+
+        assertThat(futureBookingId).isNotEqualTo(currentDayBookingId);
     }
 
     @Test
@@ -202,10 +218,14 @@ class BookingControllerIntegrationTests {
     }
 
     private String createBooking(String token, Fixture fixture, String startsAt) throws Exception {
+        return createBooking(token, fixture, "2026-09-07", startsAt);
+    }
+
+    private String createBooking(String token, Fixture fixture, String date, String startsAt) throws Exception {
         String response = mockMvc.perform(post("/api/v1/bookings")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(bookingJson(fixture, startsAt)))
+                        .content(bookingJson(fixture, date, startsAt)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.price").value(1500.00))
@@ -325,12 +345,16 @@ class BookingControllerIntegrationTests {
     }
 
     private String bookingJson(Fixture fixture, String startsAt) {
+        return bookingJson(fixture, "2026-09-07", startsAt);
+    }
+
+    private String bookingJson(Fixture fixture, String date, String startsAt) {
         return """
                 {
                   "branchId": "%s",
                   "serviceOfferingId": "%s",
                   "resourceId": "%s",
-                  "date": "2026-09-07",
+                  "date": "%s",
                   "startsAt": "%s",
                   "customerName": "Cliente %s",
                   "customerPhone": "+54 11 5555-1234"
@@ -339,6 +363,7 @@ class BookingControllerIntegrationTests {
                 fixture.branchId(),
                 fixture.serviceOfferingId(),
                 fixture.resourceId(),
+                date,
                 startsAt,
                 fixture.prefix()
         );

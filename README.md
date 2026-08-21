@@ -71,6 +71,11 @@ Variables CORS:
 
 Con perfil `local`, el backend permite por defecto requests desde Angular en `http://localhost:4200`.
 Si el frontend corre en otro origen, configurar `CORS_ALLOWED_ORIGINS`, por ejemplo `http://localhost:4200,http://localhost:5173`.
+Para el frontend productivo desplegado en Railway, usar:
+
+```text
+CORS_ALLOWED_ORIGINS=http://localhost:4200,https://hallarturnofront-production.up.railway.app
+```
 
 ## Railway
 
@@ -80,6 +85,21 @@ Para Railway hay dos caminos soportados:
 - Definir las variables `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME` y `DB_PASSWORD`.
 
 No hay secretos versionados. Las credenciales de `prod` deben venir siempre desde variables de entorno.
+
+Variables requeridas para el backend en Railway:
+
+```text
+SPRING_PROFILES_ACTIVE=prod
+PORT=8080
+JWT_SECRET=<secreto-largo>
+CORS_ALLOWED_ORIGINS=http://localhost:4200,https://hallarturnofront-production.up.railway.app
+CORS_ALLOW_CREDENTIALS=false
+DB_HOST=<host-postgresql>
+DB_PORT=<puerto-postgresql>
+DB_NAME=<database>
+DB_USERNAME=<usuario>
+DB_PASSWORD=<password>
+```
 
 ## Ejecucion local
 

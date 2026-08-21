@@ -32,7 +32,7 @@ public interface BusinessRepository extends JpaRepository<Business, UUID> {
                         where offering.business = business
                           and offering.status = :offeringStatus
                           and (
-                                lower(offering.name) like :textPattern
+                                lower(function('unaccent', offering.name)) like :textPattern
                                 or lower(coalesce(offering.description, '')) like :textPattern
                           )
                     )

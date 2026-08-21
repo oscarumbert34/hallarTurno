@@ -12,6 +12,7 @@ import com.turnero.common.ApiException;
 import com.turnero.service.ServiceOffering;
 import com.turnero.service.ServiceOfferingRepository;
 import com.turnero.service.ServiceOfferingStatus;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.LinkedHashMap;
@@ -29,9 +30,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class PublicAvailabilityService {
 
     private static final int DEFAULT_SIZE = 10;
-    private static final int MAX_SIZE = 20;
-    private static final int DEFAULT_MAX_SLOTS_PER_SERVICE = 5;
-    private static final int MAX_SLOTS_PER_SERVICE = 20;
+    private static final int MAX_SIZE = 50;
+    private static final int DEFAULT_LIMIT = 10;
+    private static final int MAX_LIMIT = 50;
 
     private final ServiceOfferingRepository serviceOfferingRepository;
     private final BusinessRepository businessRepository;
@@ -61,16 +62,23 @@ public class PublicAvailabilityService {
             UUID businessId,
             int page,
             int size,
+            int offset,
+            Integer limit,
             int maxSlotsPerService
     ) {
         if (date == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Availability date is required");
         }
-        String normalizedText = normalizeText(service == null || service.isBlank() ? text : service);
+        String normalizedText = normalizeSearchText(service == null || service.isBlank() ? text : service);
         String normalizedLocality = normalizeText(locality);
         int normalizedPage = Math.max(page, 0);
         int normalizedSize = normalizePositive(size, DEFAULT_SIZE, MAX_SIZE);
-        int normalizedMaxSlots = normalizePositive(maxSlotsPerService, DEFAULT_MAX_SLOTS_PER_SERVICE, MAX_SLOTS_PER_SERVICE);
+        int normalizedOffset = Math.max(offset, 0);
+        int normalizedLimit = normalizePositive(
+                limit == null ? maxSlotsPerService : limit,
+                DEFAULT_LIMIT,
+                MAX_LIMIT
+        );
 
         String textPattern = normalizedText == null ? "" : "%" + normalizedText + "%";
         var businesses = businessRepository.searchPublicAvailabilityBusinesses(
@@ -98,30 +106,42 @@ public class PublicAvailabilityService {
                 );
 
         Map<UUID, List<Branch>> branchesByBusiness = findBranchesByBusiness(businessIds, normalizedLocality);
-        Map<UUID, BusinessGroup> businessGroups = new LinkedHashMap<>();
+        List<SlotOption> slotOptions = new java.util.ArrayList<>();
 
         for (ServiceOffering offering : offerings) {
             List<Branch> candidateBranches = candidateBranches(offering, branchesByBusiness, normalizedLocality);
             for (Branch branch : candidateBranches) {
-                List<PublicAvailabilitySlotResponse> slots = availabilityService
+                availabilityService
                         .findAvailableSlots(branch.getId(), offering.getId(), date)
                         .stream()
                         .filter(slot -> withinRequestedRange(slot, startsFrom, startsTo))
-                        .limit(normalizedMaxSlots)
-                        .map(this::toPublicSlot)
-                        .toList();
-                if (slots.isEmpty()) {
-                    continue;
-                }
-                addResult(businessGroups, offering, branch, slots);
+                        .map(slot -> new SlotOption(offering, branch, slot))
+                        .forEach(slotOptions::add);
             }
         }
+
+        int totalAvailableSlots = slotOptions.size();
+        int toIndex = (int) Math.min(totalAvailableSlots, (long) normalizedOffset + normalizedLimit);
+        List<SlotOption> paginatedSlots = normalizedOffset >= totalAvailableSlots
+                ? List.of()
+                : slotOptions.subList(normalizedOffset, toIndex);
+        Map<UUID, BusinessGroup> businessGroups = new LinkedHashMap<>();
+        paginatedSlots.forEach(slotOption -> addResult(
+                businessGroups,
+                slotOption.offering(),
+                slotOption.branch(),
+                toPublicSlot(slotOption.slot())
+        ));
 
         return new PublicAvailabilityPageResponse(
                 normalizedPage,
                 normalizedSize,
+                normalizedOffset,
+                normalizedLimit,
                 businesses.getTotalElements(),
                 businesses.getTotalPages(),
+                totalAvailableSlots,
+                toIndex < totalAvailableSlots,
                 businessGroups.values().stream().map(BusinessGroup::toResponse).toList()
         );
     }
@@ -167,7 +187,7 @@ public class PublicAvailabilityService {
             Map<UUID, BusinessGroup> businessGroups,
             ServiceOffering offering,
             Branch branch,
-            List<PublicAvailabilitySlotResponse> slots
+            PublicAvailabilitySlotResponse slot
     ) {
         Business business = offering.getBusiness();
         BusinessGroup businessGroup = businessGroups.computeIfAbsent(
@@ -178,15 +198,7 @@ public class PublicAvailabilityService {
                 branch.getId(),
                 ignored -> new BranchGroup(branch)
         );
-        branchGroup.services.add(new PublicAvailabilityServiceResponse(
-                offering.getId(),
-                offering.getName(),
-                offering.getDescription(),
-                offering.getDurationMinutes(),
-                offering.getPrice(),
-                offering.getCurrency(),
-                slots
-        ));
+        branchGroup.addSlot(offering, slot);
     }
 
     private PublicAvailabilitySlotResponse toPublicSlot(AvailabilitySlotResponse slot) {
@@ -209,11 +221,52 @@ public class PublicAvailabilityService {
         return value.trim().toLowerCase();
     }
 
+    private String normalizeSearchText(String value) {
+        String normalized = normalizeText(value);
+        if (normalized == null) {
+            return null;
+        }
+        return Normalizer.normalize(normalized, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+    }
+
     private int normalizePositive(int requested, int defaultValue, int maxValue) {
         if (requested <= 0) {
             return defaultValue;
         }
         return Math.min(requested, maxValue);
+    }
+
+    private record SlotOption(
+            ServiceOffering offering,
+            Branch branch,
+            AvailabilitySlotResponse slot
+    ) {
+    }
+
+    private static class ServiceGroup {
+        private final ServiceOffering offering;
+        private final List<PublicAvailabilitySlotResponse> slots = new java.util.ArrayList<>();
+
+        private ServiceGroup(ServiceOffering offering) {
+            this.offering = Objects.requireNonNull(offering);
+        }
+
+        private void addSlot(PublicAvailabilitySlotResponse slot) {
+            slots.add(slot);
+        }
+
+        private PublicAvailabilityServiceResponse toResponse() {
+            return new PublicAvailabilityServiceResponse(
+                    offering.getId(),
+                    offering.getName(),
+                    offering.getDescription(),
+                    offering.getDurationMinutes(),
+                    offering.getPrice(),
+                    offering.getCurrency(),
+                    slots
+            );
+        }
     }
 
     private static class BusinessGroup {
@@ -237,10 +290,18 @@ public class PublicAvailabilityService {
 
     private static class BranchGroup {
         private final Branch branch;
-        private final List<PublicAvailabilityServiceResponse> services = new java.util.ArrayList<>();
+        private final Map<UUID, ServiceGroup> services = new LinkedHashMap<>();
 
         private BranchGroup(Branch branch) {
             this.branch = Objects.requireNonNull(branch);
+        }
+
+        private void addSlot(ServiceOffering offering, PublicAvailabilitySlotResponse slot) {
+            ServiceGroup serviceGroup = services.computeIfAbsent(
+                    offering.getId(),
+                    ignored -> new ServiceGroup(offering)
+            );
+            serviceGroup.addSlot(slot);
         }
 
         private PublicAvailabilityBranchResponse toResponse() {
@@ -254,7 +315,7 @@ public class PublicAvailabilityService {
                     branch.getLatitude(),
                     branch.getLongitude(),
                     branch.getZoneId(),
-                    services
+                    services.values().stream().map(ServiceGroup::toResponse).toList()
             );
         }
     }

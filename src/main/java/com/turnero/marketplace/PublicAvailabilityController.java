@@ -34,8 +34,10 @@ public class PublicAvailabilityController {
             @RequestParam(required = false) String locality,
             @RequestParam(required = false) UUID businessId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "10") @Min(1) @Max(20) int size,
-            @RequestParam(defaultValue = "5") @Min(1) @Max(20) int maxSlotsPerService
+            @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size,
+            @RequestParam(defaultValue = "0") @Min(0) int offset,
+            @RequestParam(required = false) @Min(1) @Max(50) Integer limit,
+            @RequestParam(defaultValue = "5") @Min(1) @Max(50) int maxSlotsPerService
     ) {
         return availabilityService.search(
                 q,
@@ -47,6 +49,8 @@ public class PublicAvailabilityController {
                 businessId,
                 page,
                 size,
+                offset,
+                limit,
                 maxSlotsPerService
         );
     }

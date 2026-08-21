@@ -19,8 +19,11 @@ import com.turnero.user.UserRole;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Comparator;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -131,10 +134,24 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public BookingPageResponse findByBusiness(UUID businessId, AuthenticatedUser currentUser, int page, int size) {
+        return findByBusiness(businessId, currentUser, page, size, null);
+    }
+
+    @Transactional(readOnly = true)
+    public BookingPageResponse findByBusiness(
+            UUID businessId,
+            AuthenticatedUser currentUser,
+            int page,
+            int size,
+            LocalDate date
+    ) {
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Business not found"));
         ownershipGuard.requireOwnerOrAdmin(business, currentUser, "Bookings can only be viewed by the business owner or an admin");
-        Page<BookingResponse> bookings = bookingRepository.findByBusinessIdOrderByStartsAtDesc(
+        if (date != null) {
+            return findByBusinessAndDate(businessId, page, size, date);
+        }
+        Page<BookingResponse> bookings = bookingRepository.findByBusinessIdOrderByStartsAtAscIdAsc(
                         businessId,
                         PageRequest.of(page, size)
                 )
@@ -146,6 +163,56 @@ public class BookingService {
                 bookings.getTotalPages(),
                 bookings.getContent()
         );
+    }
+
+    private BookingPageResponse findByBusinessAndDate(UUID businessId, int page, int size, LocalDate date) {
+        List<Branch> branches = branchRepository.findDistinctByBusinessIdOrderByNameAsc(businessId);
+        if (branches.isEmpty()) {
+            return emptyPage(page, size);
+        }
+        Instant startsAtFrom = branches.stream()
+                .map(branch -> dayStart(date, ZoneId.of(branch.getZoneId())))
+                .min(Comparator.naturalOrder())
+                .orElseThrow();
+        Instant startsAtTo = branches.stream()
+                .map(branch -> dayEnd(date, ZoneId.of(branch.getZoneId())))
+                .max(Comparator.naturalOrder())
+                .orElseThrow();
+        List<BookingResponse> results = bookingRepository
+                .findByBusinessIdAndStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAscIdAsc(
+                        businessId,
+                        startsAtFrom,
+                        startsAtTo
+                ).stream()
+                .filter(booking -> startsOnLocalDate(booking, date))
+                .map(BookingResponse::from)
+                .toList();
+        int fromIndex = (int) Math.min((long) page * size, results.size());
+        int toIndex = Math.min(fromIndex + size, results.size());
+        return new BookingPageResponse(
+                page,
+                size,
+                results.size(),
+                (int) Math.ceil((double) results.size() / size),
+                results.subList(fromIndex, toIndex)
+        );
+    }
+
+    private boolean startsOnLocalDate(Booking booking, LocalDate date) {
+        ZoneId branchZoneId = ZoneId.of(booking.getBranch().getZoneId());
+        return LocalDateTime.ofInstant(booking.getStartsAt(), branchZoneId).toLocalDate().equals(date);
+    }
+
+    private Instant dayStart(LocalDate date, ZoneId zoneId) {
+        return date.atStartOfDay(zoneId).toInstant();
+    }
+
+    private Instant dayEnd(LocalDate date, ZoneId zoneId) {
+        return date.plusDays(1).atStartOfDay(zoneId).toInstant();
+    }
+
+    private BookingPageResponse emptyPage(int page, int size) {
+        return new BookingPageResponse(page, size, 0, 0, List.of());
     }
 
     private void assertSlotAvailable(BookingRequest request) {

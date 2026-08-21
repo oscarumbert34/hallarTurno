@@ -4,7 +4,9 @@ import com.turnero.auth.AuthenticatedUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.time.LocalDate;
 import java.util.UUID;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -57,9 +59,10 @@ public class BookingController {
             @PathVariable UUID businessId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @AuthenticationPrincipal AuthenticatedUser currentUser
     ) {
-        return bookingService.findByBusiness(businessId, currentUser, page, size);
+        return bookingService.findByBusiness(businessId, currentUser, page, size, date);
     }
 }
 

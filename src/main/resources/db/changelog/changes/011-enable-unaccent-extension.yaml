@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-enable-unaccent-extension
+      author: turnero
+      comment: Enable accent-insensitive public service name searches.
+      changes:
+        - sql:
+            dbms: postgresql
+            sql: CREATE EXTENSION IF NOT EXISTS unaccent
