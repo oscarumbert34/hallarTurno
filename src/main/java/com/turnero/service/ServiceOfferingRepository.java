@@ -35,8 +35,8 @@ public interface ServiceOfferingRepository extends JpaRepository<ServiceOffering
               and (
                     :hasText = false
                     or lower(function('unaccent', offering.name)) like :textPattern
-                    or lower(coalesce(offering.description, '')) like :textPattern
-                    or lower(business.name) like :textPattern
+                    or lower(function('unaccent', coalesce(offering.description, ''))) like :textPattern
+                    or lower(function('unaccent', business.name)) like :textPattern
               )
               and (
                     :hasLocality = false
@@ -75,8 +75,8 @@ public interface ServiceOfferingRepository extends JpaRepository<ServiceOffering
               and (
                     :hasText = false
                     or lower(function('unaccent', offering.name)) like :textPattern
-                    or lower(coalesce(offering.description, '')) like :textPattern
-                    or lower(business.name) like :textPattern
+                    or lower(function('unaccent', coalesce(offering.description, ''))) like :textPattern
+                    or lower(function('unaccent', business.name)) like :textPattern
               )
             order by business.name asc, offering.name asc
             """)

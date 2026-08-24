@@ -1,4 +1,4 @@
-package com.turnero.marketplace;
+package com.turnero.marketplace.dto;
 
 import java.math.BigDecimal;
 import java.util.List;

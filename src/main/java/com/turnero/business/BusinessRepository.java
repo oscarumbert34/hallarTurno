@@ -25,7 +25,7 @@ public interface BusinessRepository extends JpaRepository<Business, UUID> {
               and (:hasBusinessId = false or business.id = :businessId)
               and (
                     :hasText = false
-                    or lower(business.name) like :textPattern
+                    or lower(function('unaccent', business.name)) like :textPattern
                     or exists (
                         select offering.id
                         from ServiceOffering offering
@@ -33,7 +33,7 @@ public interface BusinessRepository extends JpaRepository<Business, UUID> {
                           and offering.status = :offeringStatus
                           and (
                                 lower(function('unaccent', offering.name)) like :textPattern
-                                or lower(coalesce(offering.description, '')) like :textPattern
+                                or lower(function('unaccent', coalesce(offering.description, ''))) like :textPattern
                           )
                     )
               )

@@ -1,4 +1,4 @@
-package com.turnero.marketplace;
+package com.turnero.marketplace.dto;
 
 import java.util.List;
 import java.util.UUID;

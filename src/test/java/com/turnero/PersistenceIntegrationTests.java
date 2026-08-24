@@ -39,7 +39,7 @@ class PersistenceIntegrationTests {
                 var statement = connection.createStatement();
                 var resultSet = statement.executeQuery("select count(*) from databasechangelog")) {
             assertThat(resultSet.next()).isTrue();
-            assertThat(resultSet.getInt(1)).isEqualTo(10);
+            assertThat(resultSet.getInt(1)).isEqualTo(11);
         }
     }
 

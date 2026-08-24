@@ -2,15 +2,15 @@ package com.turnero;
 
 import com.turnero.auth.AuthService;
 import com.turnero.availability.AvailabilityService;
-import com.turnero.branch.BranchService;
 import com.turnero.booking.BookingService;
+import com.turnero.branch.BranchService;
 import com.turnero.business.BusinessService;
 import com.turnero.employee.BookableResourceService;
 import com.turnero.marketplace.PublicAvailabilityService;
 import com.turnero.service.ServiceOfferingService;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 @SpringBootTest(properties = {
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"

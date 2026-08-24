@@ -1,12 +1,9 @@
 package com.turnero;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import com.turnero.auth.AuthService;
 import com.turnero.availability.AvailabilityService;
-import com.turnero.branch.BranchService;
 import com.turnero.booking.BookingService;
+import com.turnero.branch.BranchService;
 import com.turnero.business.BusinessService;
 import com.turnero.employee.BookableResourceService;
 import com.turnero.marketplace.PublicAvailabilityService;
@@ -17,6 +14,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
@@ -56,37 +56,37 @@ class ActuatorHealthSecurityTests {
     private final MockMvc mockMvc;
 
     @Autowired
-    ActuatorHealthSecurityTests(MockMvc mockMvc) {
+    ActuatorHealthSecurityTests(final MockMvc mockMvc) {
         this.mockMvc = mockMvc;
     }
 
     @Test
     void healthEndpointIsPublic() throws Exception {
-        mockMvc.perform(get("/actuator/health"))
+        this.mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk());
     }
 
     @Test
     void readinessAndLivenessEndpointsArePublic() throws Exception {
-        mockMvc.perform(get("/actuator/health/readiness"))
+        this.mockMvc.perform(get("/actuator/health/readiness"))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/actuator/health/liveness"))
+        this.mockMvc.perform(get("/actuator/health/liveness"))
                 .andExpect(status().isOk());
     }
 
     @Test
     void infoAndMetricsEndpointsArePublic() throws Exception {
-        mockMvc.perform(get("/actuator/info"))
+        this.mockMvc.perform(get("/actuator/info"))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/actuator/metrics"))
+        this.mockMvc.perform(get("/actuator/metrics"))
                 .andExpect(status().isOk());
     }
 
     @Test
     void nonHealthEndpointsRequireAuthentication() throws Exception {
-        mockMvc.perform(get("/actuator"))
+        this.mockMvc.perform(get("/actuator"))
                 .andExpect(status().isUnauthorized());
     }
 }

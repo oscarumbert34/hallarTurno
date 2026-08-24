@@ -188,7 +188,7 @@ class BookingControllerIntegrationTests {
                 secondOfferingId
         );
         Fixture secondBranch = new Fixture(
-                firstBranch.prefix(),
+                "booking-branch-filter-other",
                 firstBranch.ownerToken(),
                 firstBranch.customerToken(),
                 firstBranch.businessId(),
