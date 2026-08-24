@@ -38,6 +38,7 @@ Tambien se pueden ajustar valores conservadores del pool Hikari:
 | `DB_POOL_CONNECTION_TIMEOUT` | `30000` |
 | `DB_POOL_IDLE_TIMEOUT` | `600000` |
 | `DB_POOL_MAX_LIFETIME` | `1800000` |
+| `SHUTDOWN_TIMEOUT` | `20s` |
 
 Variables JWT:
 
@@ -115,10 +116,12 @@ Ejecutar la aplicacion:
 mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
-Health check publico:
+Health checks publicos:
 
 ```bash
 curl http://localhost:8080/actuator/health
+curl http://localhost:8080/actuator/health/readiness
+curl http://localhost:8080/actuator/health/liveness
 ```
 
 ## Docker
@@ -155,7 +158,7 @@ docker run --rm -p 8080:8080 \
 Health check:
 
 ```bash
-curl http://localhost:8080/actuator/health
+curl http://localhost:8080/actuator/health/readiness
 ```
 
 La imagen respeta `JAVA_TOOL_OPTIONS` automaticamente y tambien permite `JAVA_OPTS`, por ejemplo:
@@ -177,16 +180,23 @@ En Railway, definir `SPRING_PROFILES_ACTIVE=prod`, `JWT_SECRET` y las variables 
 
 ## Seguridad
 
-`/actuator/health`, auth, marketplace y el listado publico de negocios quedan expuestos publicamente. El resto de los endpoints requiere autenticacion JWT Bearer.
+`/actuator/health`, `/actuator/info`, `/actuator/metrics`, auth, marketplace y el listado publico de negocios quedan expuestos publicamente. El resto de los endpoints requiere autenticacion JWT Bearer.
 
 Endpoints publicos:
 
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`
 - `GET /api/v1/businesses`
+- `GET /api/v1/businesses/{businessId}/branches`
 - `GET /api/v1/businesses/{businessId}/service-offerings`
 - `GET /api/v1/public/availability`
+- `GET /api/v1/public/availability/{serviceOfferingId}/slots`
+- `POST /api/v1/public/bookings`
 - `GET /actuator/health`
+- `GET /actuator/health/readiness`
+- `GET /actuator/health/liveness`
+- `GET /actuator/info`
+- `GET /actuator/metrics`
 
 La respuesta de login incluye `businessId` cuando el usuario autenticado es propietario de al menos un negocio; si no tiene negocio asociado, se devuelve `null`.
 
@@ -206,6 +216,59 @@ Matriz de permisos:
 
 Los chequeos de ownership se centralizan en `OwnershipGuard`. Cambiar IDs en URLs no debe permitir leer ni modificar datos de otro tenant. Los endpoints publicos nunca exponen entidades JPA ni datos sensibles de owners.
 
+## Observabilidad y operacion
+
+Actuator expone health, readiness, liveness, info y metrics para monitoreo MVP:
+
+```text
+GET /actuator/health
+GET /actuator/health/readiness
+GET /actuator/health/liveness
+GET /actuator/info
+GET /actuator/metrics
+```
+
+El health incluye el indicador de base de datos provisto por Spring Boot. Si PostgreSQL no responde, `/actuator/health` y `/actuator/health/readiness` deben reportar estado no saludable. El `Dockerfile` usa readiness como healthcheck del contenedor.
+
+Cada request recibe o reutiliza un `X-Request-Id`. Ese id se devuelve en el header, se incluye en el campo `requestId` de los errores y se agrega al MDC de logs. Los logs de request usan nivel `INFO` para respuestas exitosas, `WARN` para 4xx y `ERROR` para 5xx. No se loguean JWT, passwords, nombres de clientes ni telefonos.
+
+Errores inesperados responden un body seguro:
+
+```json
+{
+  "requestId": "b0d7d87c-4a59-4b0a-b583-a6b661b5b4dd",
+  "status": 500,
+  "error": "Internal Server Error",
+  "message": "Unexpected error",
+  "path": "/api/v1/example",
+  "details": []
+}
+```
+
+Metricas MVP disponibles via Actuator:
+
+| Metrica | Uso |
+| --- | --- |
+| `turnero.bookings.created` | Reservas creadas, tag `channel=public|authenticated`. |
+| `turnero.bookings.conflicts` | Intentos de reserva rechazados por slot no disponible o tomado. |
+| `turnero.http.errors` | Errores 5xx manejados por `GlobalExceptionHandler`, tag `status`. |
+| `http.server.requests` | Metrica HTTP estandar de Spring Boot. |
+
+Checklist inicial de produccion:
+
+- Configurar `JWT_SECRET`, CORS productivo y credenciales de DB solo por variables de entorno.
+- Usar `/actuator/health/readiness` para healthcheck de contenedor/plataforma.
+- Revisar logs filtrando por `requestId` ante incidentes.
+- Alertas futuras recomendadas, sin implementarlas aun: alerta por readiness DOWN, tasa de 5xx, latencia alta, conflictos de reserva anormales y consumo de conexiones Hikari. Sentry puede cubrir errores de aplicacion; Grafana/Prometheus puede cubrir metricas.
+- Mantener `server.shutdown=graceful` y ajustar `SHUTDOWN_TIMEOUT` si Railway corta procesos antes de terminar requests.
+
+Backups y restore:
+
+- En produccion Railway, usar la politica de backups/snapshots del servicio PostgreSQL del proyecto como respaldo primario. Validar en Railway que el plan activo tenga backups habilitados y retencion suficiente antes de salir a produccion.
+- Antes de cambios riesgosos de esquema o datos, generar backup manual con `pg_dump` desde una maquina autorizada.
+- Restore manual esperado: detener trafico o poner la app en mantenimiento, restaurar con `pg_restore`/`psql` sobre una DB limpia, ejecutar la app para validar Liquibase y revisar `/actuator/health/readiness`.
+- No versionar dumps ni credenciales. Guardar dumps cifrados y con acceso restringido.
+
 Endpoints protegidos de negocios:
 
 - `POST /api/v1/businesses`
@@ -216,7 +279,6 @@ Endpoints protegidos de negocios:
 Endpoints protegidos de sucursales:
 
 - `POST /api/v1/businesses/{businessId}/branches`
-- `GET /api/v1/businesses/{businessId}/branches`
 - `GET /api/v1/branches/{id}`
 - `PUT /api/v1/branches/{id}`
 - `DELETE /api/v1/branches/{id}`
@@ -249,6 +311,7 @@ Disponibilidad:
 Marketplace publico:
 
 - `GET /api/v1/public/availability`
+- `GET /api/v1/public/availability/{serviceOfferingId}/slots`
 
 Parametros soportados:
 
@@ -261,11 +324,24 @@ Parametros soportados:
 | `startsTo` | Hora maxima del inicio del slot, formato `HH:mm`. |
 | `locality` | Localidad exacta, sin distinguir mayusculas/minusculas. |
 | `businessId` | ID del negocio para limitar la busqueda a un negocio puntual. |
+| `branchId` | ID de sucursal para limitar la busqueda a una sucursal puntual. |
 | `page` | Pagina de negocios candidatos, default `0`. |
-| `size` | Cantidad de negocios candidatos, default `10`, maximo `20`. |
-| `maxSlotsPerService` | Slots devueltos por servicio/sucursal, default `5`, maximo `20`. |
+| `size` | Cantidad de negocios candidatos, default `10`, maximo `50`. |
+| `offset` | Desplazamiento sobre servicios/sucursal con disponibilidad, default `0`. |
+| `limit` | Cantidad maxima de servicios/sucursal devueltos, default `10`, maximo `50`. |
+| `maxSlotsPerService` | Slots devueltos por servicio/sucursal, default `10`, maximo `50`. |
 
-La respuesta esta agrupada por negocio y sucursal, expone solo DTOs publicos, incluye precio/duracion de servicios y limita la cantidad de slots. Solo aparecen negocios, sucursales y servicios activos. Los slots se calculan con el mismo motor de disponibilidad, por lo que reflejan reservas confirmadas/pendientes y ausencias vigentes.
+La respuesta esta agrupada por negocio y sucursal, expone solo DTOs publicos, incluye precio/duracion de servicios y limita la cantidad de slots. Incluye metadata de paginacion (`page`, `size`, `offset`, `limit`, `totalElements`, `totalPages`, `totalMatchingServices`, `totalAvailableSlots`, `hasMore`). Solo aparecen negocios, sucursales y servicios activos. Los slots se calculan con el mismo motor de disponibilidad, por lo que reflejan reservas confirmadas/pendientes y ausencias vigentes.
+
+Los slots representan una opcion concreta de recurso. Si dos recursos pueden tomar el mismo horario, el backend puede devolver dos slots con el mismo `startsAt` y distinto `resourceId`/`resourceName`; el frontend debe usar esos campos para distinguirlos o agruparlos visualmente por hora.
+
+Para ver mas horarios de un servicio puntual se usa:
+
+```text
+GET /api/v1/public/availability/{serviceOfferingId}/slots?branchId=<branchId>&date=2026-08-25&startsFrom=09:00&startsTo=18:00&offset=10&limit=10
+```
+
+La respuesta de slots incluye `serviceOfferingId`, `branchId`, `offset`, `limit`, `totalAvailableSlots`, `hasMore` y `slots`.
 
 Endpoints protegidos de reservas:
 
@@ -274,7 +350,7 @@ Endpoints protegidos de reservas:
 - `POST /api/v1/bookings/{id}/cancel`
 - `GET /api/v1/businesses/{businessId}/bookings`
 
-Las reservas requieren `customerName` y `customerPhone`, se crean como `CONFIRMED`, guardan snapshot de contacto, servicio, recurso, duracion, precio y moneda, y no se borran fisicamente. La cancelacion minima permite cancelar al cliente de la reserva, al owner del negocio o a `ADMIN`. El listado por negocio es paginado (`page`, `size`; maximo `50`) y solo lo puede consultar el owner del negocio o `ADMIN`. Para evitar doble booking se revalida disponibilidad dentro de la transaccion y PostgreSQL aplica una constraint de exclusion por recurso y rango horario para reservas activas.
+Las reservas requieren `customerName` y `customerPhone`, se crean como `CONFIRMED`, guardan snapshot de contacto, servicio, recurso, duracion, precio y moneda, y no se borran fisicamente. La cancelacion minima permite cancelar al cliente de la reserva, al owner del negocio o a `ADMIN`. El listado por negocio es paginado (`page`, `size`; maximo `50`) y solo lo puede consultar el owner del negocio o `ADMIN`. Devuelve contrato estable con `page`, `size`, `maxSize`, `totalElements`, `totalPages`, `hasMore`, `sort` y `results`; el orden es cronologico ascendente por `startsAt` y luego `id` (`startsAt:asc,id:asc`). Si se informa `date`, el filtro aplica sobre la fecha local del turno en la zona horaria de la sucursal. Para evitar doble booking se revalida disponibilidad dentro de la transaccion y PostgreSQL aplica una constraint de exclusion por recurso y rango horario para reservas activas; cuando el slot ya fue tomado, la API responde `409 Conflict`.
 
 Ejemplo de creacion de reserva:
 

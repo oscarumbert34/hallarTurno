@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class BookingController {
 
+    private static final int MAX_BOOKINGS_PAGE_SIZE = 50;
+
     private final BookingService bookingService;
 
     public BookingController(BookingService bookingService) {
@@ -39,14 +41,13 @@ public class BookingController {
         return bookingService.create(request, currentUser);
     }
 
-    
     @PostMapping("/public/bookings")
     @ResponseStatus(HttpStatus.CREATED)
     public BookingResponse createPublic(@Valid @RequestBody BookingRequest request) {
         return bookingService.createPublic(request);
     }
 
-@PostMapping("/bookings/{id}/cancel")
+    @PostMapping("/bookings/{id}/cancel")
     public BookingResponse cancel(
             @PathVariable UUID id,
             @AuthenticationPrincipal AuthenticatedUser currentUser
@@ -58,7 +59,7 @@ public class BookingController {
     public BookingPageResponse findByBusiness(
             @PathVariable UUID businessId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(value = MAX_BOOKINGS_PAGE_SIZE, message = "Bookings page size must be at most 50") int size,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @AuthenticationPrincipal AuthenticatedUser currentUser
     ) {

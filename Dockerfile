@@ -26,6 +26,6 @@ ENV PORT=8080
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-    CMD curl --fail --silent "http://localhost:${PORT}/actuator/health" > /dev/null || exit 1
+    CMD curl --fail --silent "http://localhost:${PORT}/actuator/health/readiness" > /dev/null || exit 1
 
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

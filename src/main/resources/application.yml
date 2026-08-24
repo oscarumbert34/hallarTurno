@@ -1,6 +1,8 @@
 spring:
   application:
     name: turnero
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
   jackson:
     time-zone: UTC
   liquibase:
@@ -27,16 +29,34 @@ spring:
 
 server:
   port: ${PORT:8080}
+  shutdown: graceful
 
 management:
+  info:
+    env:
+      enabled: true
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,metrics
   endpoint:
     health:
+      show-details: never
       probes:
         enabled: true
+  health:
+    db:
+      enabled: true
+
+info:
+  app:
+    name: turnero
+    description: Backend Turnero
+    version: 0.0.2-SNAPSHOT
+
+logging:
+  pattern:
+    level: "%5p [requestId:%X{requestId:-}]"
 
 jwt:
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:PT15M}

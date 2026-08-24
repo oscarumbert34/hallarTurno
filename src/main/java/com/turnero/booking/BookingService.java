@@ -16,6 +16,7 @@ import com.turnero.service.ServiceOfferingRepository;
 import com.turnero.user.User;
 import com.turnero.user.UserRepository;
 import com.turnero.user.UserRole;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -25,6 +26,8 @@ import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -35,6 +38,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class BookingService {
 
+    private static final Logger log = LoggerFactory.getLogger(BookingService.class);
+    private static final int MAX_PAGE_SIZE = 50;
+    private static final String SORT_ORDER = "startsAt:asc,id:asc";
+
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final BusinessRepository businessRepository;
@@ -44,6 +51,7 @@ public class BookingService {
     private final AvailabilityService availabilityService;
     private final OwnershipGuard ownershipGuard;
     private final Clock clock;
+    private final MeterRegistry meterRegistry;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -54,7 +62,8 @@ public class BookingService {
             BookableResourceRepository resourceRepository,
             AvailabilityService availabilityService,
             OwnershipGuard ownershipGuard,
-            Clock clock
+            Clock clock,
+            MeterRegistry meterRegistry
     ) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
@@ -65,6 +74,7 @@ public class BookingService {
         this.availabilityService = availabilityService;
         this.ownershipGuard = ownershipGuard;
         this.clock = clock;
+        this.meterRegistry = meterRegistry;
     }
 
     @Transactional
@@ -115,9 +125,30 @@ public class BookingService {
                 BookingStatus.CONFIRMED
         );
         try {
-            return BookingResponse.from(bookingRepository.saveAndFlush(booking));
+            BookingResponse response = BookingResponse.from(bookingRepository.saveAndFlush(booking));
+            meterRegistry.counter("turnero.bookings.created", "channel", customer == null ? "public" : "authenticated").increment();
+            log.info(
+                    "booking created id={} businessId={} branchId={} serviceOfferingId={} resourceId={} startsAt={}",
+                    response.id(),
+                    response.businessId(),
+                    response.branchId(),
+                    response.serviceOfferingId(),
+                    response.resourceId(),
+                    response.startsAt()
+            );
+            return response;
         } catch (DataIntegrityViolationException exception) {
-            throw new ApiException(HttpStatus.CONFLICT, "Booking slot is no longer available");
+            meterRegistry.counter("turnero.bookings.conflicts").increment();
+            log.warn(
+                    "booking slot conflict businessId={} branchId={} serviceOfferingId={} resourceId={} date={} startsAt={}",
+                    branch.getBusiness().getId(),
+                    request.branchId(),
+                    request.serviceOfferingId(),
+                    request.resourceId(),
+                    request.date(),
+                    request.startsAt()
+            );
+            throw new ApiException(HttpStatus.CONFLICT, "Booking slot is already taken");
         }
     }
 
@@ -159,8 +190,11 @@ public class BookingService {
         return new BookingPageResponse(
                 bookings.getNumber(),
                 bookings.getSize(),
+                MAX_PAGE_SIZE,
                 bookings.getTotalElements(),
                 bookings.getTotalPages(),
+                bookings.hasNext(),
+                SORT_ORDER,
                 bookings.getContent()
         );
     }
@@ -192,8 +226,11 @@ public class BookingService {
         return new BookingPageResponse(
                 page,
                 size,
+                MAX_PAGE_SIZE,
                 results.size(),
                 (int) Math.ceil((double) results.size() / size),
+                toIndex < results.size(),
+                SORT_ORDER,
                 results.subList(fromIndex, toIndex)
         );
     }
@@ -212,7 +249,7 @@ public class BookingService {
     }
 
     private BookingPageResponse emptyPage(int page, int size) {
-        return new BookingPageResponse(page, size, 0, 0, List.of());
+        return new BookingPageResponse(page, size, MAX_PAGE_SIZE, 0, 0, false, SORT_ORDER, List.of());
     }
 
     private void assertSlotAvailable(BookingRequest request) {
@@ -225,6 +262,15 @@ public class BookingService {
                 .anyMatch(slot -> slot.startsAt().equals(request.startsAt())
                         && slot.resourceId().equals(request.resourceId()));
         if (!available) {
+            meterRegistry.counter("turnero.bookings.conflicts").increment();
+            log.warn(
+                    "booking unavailable slot branchId={} serviceOfferingId={} resourceId={} date={} startsAt={}",
+                    request.branchId(),
+                    request.serviceOfferingId(),
+                    request.resourceId(),
+                    request.date(),
+                    request.startsAt()
+            );
             throw new ApiException(HttpStatus.CONFLICT, "Booking slot is not available");
         }
     }

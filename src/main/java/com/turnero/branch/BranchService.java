@@ -3,6 +3,7 @@ package com.turnero.branch;
 import com.turnero.auth.AuthenticatedUser;
 import com.turnero.business.Business;
 import com.turnero.business.BusinessRepository;
+import com.turnero.business.BusinessStatus;
 import com.turnero.common.ApiException;
 import com.turnero.security.OwnershipGuard;
 import java.util.List;
@@ -62,8 +63,25 @@ public class BranchService {
     public List<BranchResponse> findByBusiness(UUID businessId, AuthenticatedUser currentUser) {
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Business not found"));
+        if (currentUser == null) {
+            return findPublicByBusiness(business);
+        }
         assertOwnerOrAdmin(business, currentUser);
         return branchRepository.findDistinctByBusinessIdOrderByNameAsc(businessId).stream()
+                .map(BranchResponse::from)
+                .toList();
+    }
+
+    private List<BranchResponse> findPublicByBusiness(Business business) {
+        if (business.getStatus() != BusinessStatus.ACTIVE) {
+            return List.of();
+        }
+        return branchRepository.findPublicActiveBranchesForBusinesses(
+                        List.of(business.getId()),
+                        BranchStatus.ACTIVE,
+                        false,
+                        ""
+                ).stream()
                 .map(BranchResponse::from)
                 .toList();
     }

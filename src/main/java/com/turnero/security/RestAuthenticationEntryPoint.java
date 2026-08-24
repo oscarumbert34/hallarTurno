@@ -2,6 +2,7 @@ package com.turnero.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.turnero.common.ApiError;
+import com.turnero.common.RequestIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -28,6 +29,7 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
             AuthenticationException authException
     ) throws IOException {
         ApiError apiError = ApiError.of(
+                RequestIdFilter.currentRequestId(request),
                 HttpStatus.UNAUTHORIZED.value(),
                 HttpStatus.UNAUTHORIZED.getReasonPhrase(),
                 "Unauthorized",

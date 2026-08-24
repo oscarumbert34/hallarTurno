@@ -130,6 +130,35 @@ class PublicAvailabilityControllerIntegrationTests {
     }
 
     @Test
+    void searchCanBeFilteredByBranchId() throws Exception {
+        Fixture firstBranch = fixture("market-branch-filter", "Sesion psicologica", "Caballito", "ACTIVE", "ACTIVE", true);
+        String secondBranchId = createBranch(
+                firstBranch.ownerToken(),
+                firstBranch.businessId(),
+                "Sucursal market-branch-filter-other",
+                "Caballito",
+                "ACTIVE"
+        );
+        String secondOfferingId = createOffering(
+                firstBranch.ownerToken(),
+                firstBranch.businessId(),
+                secondBranchId,
+                "Sesion psiquiatrica",
+                "ACTIVE"
+        );
+        createResource(firstBranch.ownerToken(), secondBranchId, "Recurso market-branch-filter-other", secondOfferingId);
+
+        JsonNode response = search("/api/v1/public/availability?date=2026-09-07&service=sesion&businessId="
+                + firstBranch.businessId() + "&branchId=" + firstBranch.branchId());
+
+        assertThat(response.get("results")).hasSize(1);
+        assertThat(response.at("/results/0/branches")).hasSize(1);
+        assertThat(response.at("/results/0/branches/0/id").asText()).isEqualTo(firstBranch.branchId());
+        assertThat(response.toString()).doesNotContain(secondBranchId);
+        assertThat(response.toString()).doesNotContain("Sesion psiquiatrica");
+    }
+
+    @Test
     void searchLimitsAvailabilitySlotsPerServiceKeepingCurrentOrder() throws Exception {
         Fixture fixture = fixture("market-slot-pagination", "Corte agenda", "Caballito", "ACTIVE", "ACTIVE", true);
 
@@ -191,7 +220,15 @@ class PublicAvailabilityControllerIntegrationTests {
     void searchRejectsAvailabilityLimitAboveMaximum() throws Exception {
         mockMvc.perform(get("/api/v1/public/availability")
                         .param("date", "2026-09-07")
-                        .param("limit", "11"))
+                        .param("limit", "51"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void searchRejectsMaxSlotsPerServiceAboveMaximum() throws Exception {
+        mockMvc.perform(get("/api/v1/public/availability")
+                        .param("date", "2026-09-07")
+                        .param("maxSlotsPerService", "51"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -202,7 +239,7 @@ class PublicAvailabilityControllerIntegrationTests {
         mockMvc.perform(get("/api/v1/public/availability/" + fixture.serviceOfferingId() + "/slots")
                         .param("date", "2026-09-07")
                         .param("branchId", fixture.branchId())
-                        .param("limit", "11"))
+                        .param("limit", "51"))
                 .andExpect(status().isBadRequest());
     }
 

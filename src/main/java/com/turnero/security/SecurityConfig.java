@@ -3,6 +3,8 @@ package com.turnero.security;
 import com.turnero.auth.JwtProperties;
 import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 import org.springframework.boot.actuate.health.HealthEndpoint;
+import org.springframework.boot.actuate.info.InfoEndpoint;
+import org.springframework.boot.actuate.metrics.MetricsEndpoint;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,9 +38,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(restAuthenticationEntryPoint))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(EndpointRequest.to(HealthEndpoint.class)).permitAll()
+                        .requestMatchers(EndpointRequest.to(HealthEndpoint.class, InfoEndpoint.class, MetricsEndpoint.class)).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/public/bookings").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/businesses").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/businesses/*/branches").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/businesses/*/service-offerings").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/public/availability", "/api/v1/public/availability/*/slots").permitAll()
                         .anyRequest().authenticated())

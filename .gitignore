@@ -1,0 +1,10 @@
+.idea/
+.vscode/
+target/
+*.iml
+*.log
+*.tmp
+.env
+.env.*
+src/main/resources/application-railway-local.yml
+tareas_mejoras_codex.pdf

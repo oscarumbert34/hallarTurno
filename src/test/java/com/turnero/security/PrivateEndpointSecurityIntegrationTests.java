@@ -188,6 +188,15 @@ class PrivateEndpointSecurityIntegrationTests {
     }
 
     @Test
+    void publicBusinessBranchesEndpointDoesNotRequireAuthentication() throws Exception {
+        Tenant tenant = tenant("public-branches");
+
+        mockMvc.perform(get("/api/v1/businesses/" + tenant.businessId() + "/branches"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(tenant.branchId()));
+    }
+
+    @Test
     void corsPreflightUsesConfiguredOriginWithoutWildcardCredentials() throws Exception {
         mockMvc.perform(options("/api/v1/public/availability")
                         .header(HttpHeaders.ORIGIN, "http://localhost:4200")

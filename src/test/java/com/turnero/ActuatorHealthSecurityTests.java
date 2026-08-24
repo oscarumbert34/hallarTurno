@@ -21,7 +21,10 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(properties = {
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
                 + "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,"
-                + "org.springframework.boot.autoconfigure.liquibase.LiquibaseAutoConfiguration"
+                + "org.springframework.boot.autoconfigure.liquibase.LiquibaseAutoConfiguration",
+        "management.endpoints.web.exposure.include=health,info,metrics",
+        "management.endpoint.health.probes.enabled=true",
+        "management.info.env.enabled=true"
 })
 @AutoConfigureMockMvc
 class ActuatorHealthSecurityTests {
@@ -60,6 +63,24 @@ class ActuatorHealthSecurityTests {
     @Test
     void healthEndpointIsPublic() throws Exception {
         mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void readinessAndLivenessEndpointsArePublic() throws Exception {
+        mockMvc.perform(get("/actuator/health/readiness"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/actuator/health/liveness"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void infoAndMetricsEndpointsArePublic() throws Exception {
+        mockMvc.perform(get("/actuator/info"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/actuator/metrics"))
                 .andExpect(status().isOk());
     }
 

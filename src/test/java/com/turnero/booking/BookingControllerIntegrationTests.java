@@ -112,7 +112,10 @@ class BookingControllerIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.maxSize").value(50))
                 .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.hasMore").value(false))
+                .andExpect(jsonPath("$.sort").value("startsAt:asc,id:asc"))
                 .andExpect(jsonPath("$.results.length()").value(2))
                 .andExpect(jsonPath("$.results[0].id").value(firstBookingId))
                 .andExpect(jsonPath("$.results[0].customerName").value("Cliente " + fixture.prefix()))
@@ -136,8 +139,11 @@ class BookingControllerIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.maxSize").value(50))
                 .andExpect(jsonPath("$.totalElements").value(2))
                 .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.hasMore").value(true))
+                .andExpect(jsonPath("$.sort").value("startsAt:asc,id:asc"))
                 .andExpect(jsonPath("$.results.length()").value(1))
                 .andExpect(jsonPath("$.results[0].id").value(firstBookingId));
     }
@@ -152,6 +158,9 @@ class BookingControllerIntegrationTests {
                         .header("Authorization", "Bearer " + fixture.ownerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.hasMore").value(false))
+                .andExpect(jsonPath("$.sort").value("startsAt:asc,id:asc"))
                 .andExpect(jsonPath("$.results.length()").value(1))
                 .andExpect(jsonPath("$.results[0].id").value(currentDayBookingId));
 

@@ -19,6 +19,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/public")
 public class PublicAvailabilityController {
 
+    private static final int MAX_PAGE_SIZE = 50;
+    private static final int MAX_SERVICE_LIMIT = 50;
+    private static final int MAX_SLOTS_PER_SERVICE = 50;
+
     private final PublicAvailabilityService availabilityService;
 
     public PublicAvailabilityController(PublicAvailabilityService availabilityService) {
@@ -34,11 +38,12 @@ public class PublicAvailabilityController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime startsTo,
             @RequestParam(required = false) String locality,
             @RequestParam(required = false) UUID businessId,
+            @RequestParam(required = false) UUID branchId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(value = MAX_PAGE_SIZE, message = "Availability page size must be at most 50") int size,
             @RequestParam(defaultValue = "0") @Min(0) int offset,
-            @RequestParam(required = false) @Min(1) @Max(10) Integer limit,
-            @RequestParam(defaultValue = "10") @Min(1) @Max(10) int maxSlotsPerService
+            @RequestParam(required = false) @Min(1) @Max(value = MAX_SERVICE_LIMIT, message = "Availability limit must be at most 50") Integer limit,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(value = MAX_SLOTS_PER_SERVICE, message = "Availability maxSlotsPerService must be at most 50") int maxSlotsPerService
     ) {
         return availabilityService.search(
                 q,
@@ -48,6 +53,7 @@ public class PublicAvailabilityController {
                 startsTo,
                 locality,
                 businessId,
+                branchId,
                 page,
                 size,
                 offset,
@@ -64,7 +70,7 @@ public class PublicAvailabilityController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime startsFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime startsTo,
             @RequestParam(defaultValue = "0") @Min(0) int offset,
-            @RequestParam(defaultValue = "10") @Min(1) @Max(10) int limit
+            @RequestParam(defaultValue = "10") @Min(1) @Max(value = MAX_SLOTS_PER_SERVICE, message = "Availability slots limit must be at most 50") int limit
     ) {
         return availabilityService.findSlots(
                 serviceOfferingId,
