@@ -165,7 +165,7 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public BookingPageResponse findByBusiness(UUID businessId, AuthenticatedUser currentUser, int page, int size) {
-        return findByBusiness(businessId, currentUser, page, size, null);
+        return findByBusiness(businessId, currentUser, page, size, null, null);
     }
 
     @Transactional(readOnly = true)
@@ -174,18 +174,27 @@ public class BookingService {
             AuthenticatedUser currentUser,
             int page,
             int size,
-            LocalDate date
+            LocalDate date,
+            UUID branchId
     ) {
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Business not found"));
         ownershipGuard.requireOwnerOrAdmin(business, currentUser, "Bookings can only be viewed by the business owner or an admin");
+        Branch branchFilter = findBranchFilter(businessId, branchId);
         if (date != null) {
-            return findByBusinessAndDate(businessId, page, size, date);
+            return findByBusinessAndDate(businessId, branchFilter, page, size, date);
         }
-        Page<BookingResponse> bookings = bookingRepository.findByBusinessIdOrderByStartsAtAscIdAsc(
+        Page<Booking> bookingPage = branchFilter == null
+                ? bookingRepository.findByBusinessIdOrderByStartsAtAscIdAsc(
                         businessId,
                         PageRequest.of(page, size)
                 )
+                : bookingRepository.findByBusinessIdAndBranchIdOrderByStartsAtAscIdAsc(
+                        businessId,
+                        branchFilter.getId(),
+                        PageRequest.of(page, size)
+                );
+        Page<BookingResponse> bookings = bookingPage
                 .map(BookingResponse::from);
         return new BookingPageResponse(
                 bookings.getNumber(),
@@ -199,8 +208,28 @@ public class BookingService {
         );
     }
 
-    private BookingPageResponse findByBusinessAndDate(UUID businessId, int page, int size, LocalDate date) {
-        List<Branch> branches = branchRepository.findDistinctByBusinessIdOrderByNameAsc(businessId);
+    private Branch findBranchFilter(UUID businessId, UUID branchId) {
+        if (branchId == null) {
+            return null;
+        }
+        Branch branch = branchRepository.findById(branchId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Branch not found"));
+        if (!branch.getBusiness().getId().equals(businessId)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Branch does not belong to the business");
+        }
+        return branch;
+    }
+
+    private BookingPageResponse findByBusinessAndDate(
+            UUID businessId,
+            Branch branchFilter,
+            int page,
+            int size,
+            LocalDate date
+    ) {
+        List<Branch> branches = branchFilter == null
+                ? branchRepository.findDistinctByBusinessIdOrderByNameAsc(businessId)
+                : List.of(branchFilter);
         if (branches.isEmpty()) {
             return emptyPage(page, size);
         }
@@ -212,12 +241,19 @@ public class BookingService {
                 .map(branch -> dayEnd(date, ZoneId.of(branch.getZoneId())))
                 .max(Comparator.naturalOrder())
                 .orElseThrow();
-        List<BookingResponse> results = bookingRepository
-                .findByBusinessIdAndStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAscIdAsc(
+        List<Booking> candidates = branchFilter == null
+                ? bookingRepository.findByBusinessIdAndStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAscIdAsc(
                         businessId,
                         startsAtFrom,
                         startsAtTo
-                ).stream()
+                )
+                : bookingRepository.findByBusinessIdAndBranchIdAndStartsAtGreaterThanEqualAndStartsAtLessThanOrderByStartsAtAscIdAsc(
+                        businessId,
+                        branchFilter.getId(),
+                        startsAtFrom,
+                        startsAtTo
+                );
+        List<BookingResponse> results = candidates.stream()
                 .filter(booking -> startsOnLocalDate(booking, date))
                 .map(BookingResponse::from)
                 .toList();

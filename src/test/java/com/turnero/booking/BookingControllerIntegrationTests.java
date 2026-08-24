@@ -168,6 +168,51 @@ class BookingControllerIntegrationTests {
     }
 
     @Test
+    void businessBookingListCanBeFilteredByBranch() throws Exception {
+        Fixture firstBranch = fixture("booking-branch-filter");
+        String secondBranchId = createBranch(
+                firstBranch.ownerToken(),
+                firstBranch.businessId(),
+                "Sucursal booking-branch-filter-other"
+        );
+        String secondOfferingId = createOffering(
+                firstBranch.ownerToken(),
+                firstBranch.businessId(),
+                secondBranchId,
+                "Servicio booking-branch-filter-other"
+        );
+        String secondResourceId = createResource(
+                firstBranch.ownerToken(),
+                secondBranchId,
+                "Recurso booking-branch-filter-other",
+                secondOfferingId
+        );
+        Fixture secondBranch = new Fixture(
+                firstBranch.prefix(),
+                firstBranch.ownerToken(),
+                firstBranch.customerToken(),
+                firstBranch.businessId(),
+                secondBranchId,
+                secondOfferingId,
+                secondResourceId
+        );
+        String firstBranchBookingId = createBooking(firstBranch.customerToken(), firstBranch, "2026-09-07", "09:00");
+        String secondBranchBookingId = createBooking(secondBranch.customerToken(), secondBranch, "2026-09-07", "09:00");
+
+        mockMvc.perform(get("/api/v1/businesses/" + firstBranch.businessId() + "/bookings")
+                        .param("date", "2026-09-07")
+                        .param("branchId", secondBranchId)
+                        .header("Authorization", "Bearer " + firstBranch.ownerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.results.length()").value(1))
+                .andExpect(jsonPath("$.results[0].id").value(secondBranchBookingId))
+                .andExpect(jsonPath("$.results[0].branchId").value(secondBranchId));
+
+        assertThat(firstBranchBookingId).isNotEqualTo(secondBranchBookingId);
+    }
+
+    @Test
     void unavailableBookingReturnsConflict() throws Exception {
         Fixture fixture = fixture("booking-conflict");
         createBooking(fixture.customerToken(), fixture, "09:00");
