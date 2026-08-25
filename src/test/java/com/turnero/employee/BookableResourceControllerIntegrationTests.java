@@ -65,8 +65,8 @@ class BookableResourceControllerIntegrationTests {
                 .andExpect(jsonPath("$.visibleName").value("Ana Perez"))
                 .andExpect(jsonPath("$.type").value("EMPLOYEE"))
                 .andExpect(jsonPath("$.serviceOfferingIds.length()").value(2))
-                .andExpect(jsonPath("$.weeklySchedule[0].dayOfWeek").value("MONDAY"))
-                .andExpect(jsonPath("$.weeklySchedule[0].intervals[0].startsAt").value("09:00:00"))
+                .andExpect(jsonPath("$.weeklySchedule[0].day").value("MONDAY"))
+                .andExpect(jsonPath("$.weeklySchedule[0].timeRanges[0].start").value("09:00:00"))
                 .andExpect(jsonPath("$.absences[0].date").value("2026-09-01"));
 
         mockMvc.perform(get("/api/v1/branches/" + branchId + "/resources")
@@ -92,6 +92,41 @@ class BookableResourceControllerIntegrationTests {
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].serviceOfferingIds[0]").value(offeringId))
                 .andExpect(jsonPath("$[1].serviceOfferingIds[0]").value(offeringId));
+    }
+
+    @Test
+    void ownerCanCreateResourceUsingScheduleAlias() throws Exception {
+        String token = registerAndGetToken("resource-schedule-alias@example.com");
+        String businessId = createBusiness(token, "Recursos Alias");
+        String branchId = createBranch(token, businessId, "Sucursal Alias");
+        String offeringId = createOffering(token, businessId, branchId, "Masaje");
+
+        mockMvc.perform(post("/api/v1/branches/" + branchId + "/resources")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "visibleName": "Mariela Paso",
+                                  "type": "EMPLOYEE",
+                                  "status": "ACTIVE",
+                                  "serviceOfferingIds": ["%s"],
+                                  "schedule": [
+                                    {
+                                      "day": "MONDAY",
+                                      "timeRanges": [
+                                        {"start": "09:00", "end": "12:00"},
+                                        {"start": "16:00", "end": "20:00"}
+                                      ]
+                                    }
+                                  ],
+                                  "absences": []
+                                }
+                                """.formatted(offeringId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.weeklySchedule[0].day").value("MONDAY"))
+                .andExpect(jsonPath("$.weeklySchedule[0].timeRanges.length()").value(2))
+                .andExpect(jsonPath("$.weeklySchedule[0].timeRanges[0].start").value("09:00:00"))
+                .andExpect(jsonPath("$.weeklySchedule[0].timeRanges[1].start").value("16:00:00"));
     }
 
     @Test
@@ -296,10 +331,10 @@ class BookableResourceControllerIntegrationTests {
         return """
                 [
                   {
-                    "dayOfWeek": "MONDAY",
-                    "intervals": [
-                      {"startsAt": "09:00", "endsAt": "12:00"},
-                      {"startsAt": "14:00", "endsAt": "18:00"}
+                    "day": "MONDAY",
+                    "timeRanges": [
+                      {"start": "09:00", "end": "12:00"},
+                      {"start": "14:00", "end": "18:00"}
                     ]
                   }
                 ]

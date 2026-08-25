@@ -2,7 +2,7 @@ package com.turnero.branch;
 
 import java.time.LocalTime;
 
-public record OpeningIntervalResponse(LocalTime opensAt, LocalTime closesAt) {
+public record OpeningIntervalResponse(LocalTime start, LocalTime end) {
 
     static OpeningIntervalResponse from(BranchOpeningInterval interval) {
         return new OpeningIntervalResponse(interval.getOpensAt(), interval.getClosesAt());

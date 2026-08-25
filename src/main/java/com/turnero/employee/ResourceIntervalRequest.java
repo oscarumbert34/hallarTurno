@@ -1,13 +1,16 @@
 package com.turnero.employee;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalTime;
 
 public record ResourceIntervalRequest(
         @NotNull
-        LocalTime startsAt,
+        @JsonAlias("startsAt")
+        LocalTime start,
 
         @NotNull
-        LocalTime endsAt
+        @JsonAlias("endsAt")
+        LocalTime end
 ) {
 }

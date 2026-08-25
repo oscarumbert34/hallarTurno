@@ -18,13 +18,15 @@ class ResourceAvailabilityValidatorTests {
     void acceptsClosedDaysAndNonOverlappingWorkIntervals() {
         List<BookableResource.WorkingIntervalValue> intervals = validator.validateSchedule(List.of(
                 new ResourceScheduleRequest(DayOfWeek.MONDAY, List.of(
-                        new ResourceIntervalRequest(LocalTime.of(9, 0), LocalTime.of(12, 0)),
-                        new ResourceIntervalRequest(LocalTime.of(14, 0), LocalTime.of(18, 0))
+                        new ResourceIntervalRequest(LocalTime.of(14, 0), LocalTime.of(18, 0)),
+                        new ResourceIntervalRequest(LocalTime.of(9, 0), LocalTime.of(12, 0))
                 )),
                 new ResourceScheduleRequest(DayOfWeek.TUESDAY, List.of())
         ));
 
         assertThat(intervals).hasSize(2);
+        assertThat(intervals).extracting(BookableResource.WorkingIntervalValue::startsAt)
+                .containsExactly(LocalTime.of(9, 0), LocalTime.of(14, 0));
     }
 
     @Test
@@ -48,6 +50,18 @@ class ResourceAvailabilityValidatorTests {
         )))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Resource schedule intervals overlap for MONDAY");
+    }
+
+    @Test
+    void rejectsDuplicatedWorkIntervals() {
+        assertThatThrownBy(() -> validator.validateSchedule(List.of(
+                new ResourceScheduleRequest(DayOfWeek.MONDAY, List.of(
+                        new ResourceIntervalRequest(LocalTime.of(9, 0), LocalTime.of(12, 0)),
+                        new ResourceIntervalRequest(LocalTime.of(9, 0), LocalTime.of(12, 0))
+                ))
+        )))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Resource schedule contains duplicated intervals for MONDAY");
     }
 
     @Test

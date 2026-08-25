@@ -104,11 +104,11 @@ class PublicAvailabilityControllerIntegrationTests {
 
     @Test
     void searchServiceNameIgnoresCaseAndAccents() throws Exception {
-        Fixture accentedService = fixture("market-accented-service", "MÁSÁJE relax", "Almagro", "ACTIVE", "ACTIVE", true);
+        Fixture accentedService = fixture("market-accented-service", "M\u00c1S\u00c1JE relax", "Almagro", "ACTIVE", "ACTIVE", true);
         Fixture plainService = fixture("market-plain-service", "Masaje descontracturante", "Villa Crespo", "ACTIVE", "ACTIVE", true);
 
         JsonNode unaccentedSearch = search("/api/v1/public/availability?date=2026-09-07&service=masaje&locality=Almagro");
-        JsonNode accentedSearch = search("/api/v1/public/availability?date=2026-09-07&service=másaje&locality=Villa%20Crespo");
+        JsonNode accentedSearch = searchAvailability("2026-09-07", "m\u00e1saje", "Villa Crespo");
 
         assertThat(unaccentedSearch.get("results")).hasSize(1);
         assertThat(unaccentedSearch.at("/results/0/id").asText()).isEqualTo(accentedService.businessId());
@@ -255,6 +255,18 @@ class PublicAvailabilityControllerIntegrationTests {
 
     private JsonNode search(String uri) throws Exception {
         String response = mockMvc.perform(get(uri.strip()))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(response);
+    }
+
+    private JsonNode searchAvailability(String date, String service, String locality) throws Exception {
+        String response = mockMvc.perform(get("/api/v1/public/availability")
+                        .param("date", date)
+                        .param("service", service)
+                        .param("locality", locality))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()

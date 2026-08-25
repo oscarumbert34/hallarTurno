@@ -122,6 +122,35 @@ class AvailabilityServiceTests {
     }
 
     @Test
+    void separatedTimeRangesDoNotGenerateSlotsDuringTheGap() {
+        arrangeBranchAndService(60, List.of(
+                open(DayOfWeek.MONDAY, "09:00", "13:00"),
+                open(DayOfWeek.MONDAY, "16:00", "20:00")
+        ), null);
+        BookableResource resource = resource("Ana", List.of(
+                work(DayOfWeek.MONDAY, "09:00", "13:00"),
+                work(DayOfWeek.MONDAY, "16:00", "20:00")
+        ), List.of());
+        arrangeResources(List.of(resource), List.of());
+
+        List<LocalTime> starts = availabilityService.findAvailableSlots(branchId, serviceId, MONDAY).stream()
+                .map(AvailabilitySlotResponse::startsAt)
+                .toList();
+
+        assertThat(starts).containsExactly(
+                LocalTime.of(9, 0),
+                LocalTime.of(10, 0),
+                LocalTime.of(11, 0),
+                LocalTime.of(12, 0),
+                LocalTime.of(16, 0),
+                LocalTime.of(17, 0),
+                LocalTime.of(18, 0),
+                LocalTime.of(19, 0)
+        );
+        assertThat(starts).doesNotContain(LocalTime.of(13, 0), LocalTime.of(14, 0), LocalTime.of(15, 0));
+    }
+
+    @Test
     void existingBookingPreventsOverlapsAndAllowsContiguousSlots() {
         arrangeBranchAndService(30, List.of(open(DayOfWeek.MONDAY, "09:00", "12:00")), null);
         BookableResource resource = resource("Ana", List.of(work(DayOfWeek.MONDAY, "09:00", "12:00")), List.of());
@@ -141,6 +170,66 @@ class AvailabilityServiceTests {
         assertStartsForDuration(30, LocalTime.of(9, 0), LocalTime.of(9, 30));
         assertStartsForDuration(45, LocalTime.of(9, 0));
         assertStartsForDuration(60, LocalTime.of(9, 0));
+    }
+
+    @Test
+    void serviceMustFitCompletelyInsideEachTimeRange() {
+        arrangeBranchAndService(60, List.of(open(DayOfWeek.MONDAY, "09:00", "13:00")), null);
+        BookableResource resource = resource("Ana", List.of(work(DayOfWeek.MONDAY, "09:00", "13:00")), List.of());
+        arrangeResources(List.of(resource), List.of());
+
+        List<LocalTime> starts = availabilityService.findAvailableSlots(branchId, serviceId, MONDAY).stream()
+                .map(AvailabilitySlotResponse::startsAt)
+                .toList();
+
+        assertThat(starts).containsExactly(
+                LocalTime.of(9, 0),
+                LocalTime.of(10, 0),
+                LocalTime.of(11, 0),
+                LocalTime.of(12, 0)
+        );
+        assertThat(starts).doesNotContain(LocalTime.of(12, 30));
+    }
+
+    @Test
+    void bookingsInsideDifferentTimeRangesBlockOnlyTheirOwnRange() {
+        arrangeBranchAndService(60, List.of(
+                open(DayOfWeek.MONDAY, "09:00", "13:00"),
+                open(DayOfWeek.MONDAY, "16:00", "20:00")
+        ), null);
+        BookableResource resource = resource("Ana", List.of(
+                work(DayOfWeek.MONDAY, "09:00", "13:00"),
+                work(DayOfWeek.MONDAY, "16:00", "20:00")
+        ), List.of());
+        Booking booking = booking(resource, "10:00", "11:00");
+        arrangeResources(List.of(resource), List.of(booking));
+
+        List<LocalTime> starts = availabilityService.findAvailableSlots(branchId, serviceId, MONDAY).stream()
+                .map(AvailabilitySlotResponse::startsAt)
+                .toList();
+
+        assertThat(starts).doesNotContain(LocalTime.of(10, 0));
+        assertThat(starts).contains(LocalTime.of(9, 0), LocalTime.of(11, 0), LocalTime.of(16, 0), LocalTime.of(19, 0));
+    }
+
+    @Test
+    void absencesInsideDifferentTimeRangesBlockOnlyTheirOwnRange() {
+        arrangeBranchAndService(60, List.of(
+                open(DayOfWeek.MONDAY, "09:00", "13:00"),
+                open(DayOfWeek.MONDAY, "16:00", "20:00")
+        ), null);
+        BookableResource resource = resource("Ana", List.of(
+                work(DayOfWeek.MONDAY, "09:00", "13:00"),
+                work(DayOfWeek.MONDAY, "16:00", "20:00")
+        ), List.of(absence(MONDAY, "10:00", "11:00")));
+        arrangeResources(List.of(resource), List.of());
+
+        List<LocalTime> starts = availabilityService.findAvailableSlots(branchId, serviceId, MONDAY).stream()
+                .map(AvailabilitySlotResponse::startsAt)
+                .toList();
+
+        assertThat(starts).doesNotContain(LocalTime.of(10, 0));
+        assertThat(starts).contains(LocalTime.of(9, 0), LocalTime.of(11, 0), LocalTime.of(16, 0), LocalTime.of(19, 0));
     }
 
     @Test

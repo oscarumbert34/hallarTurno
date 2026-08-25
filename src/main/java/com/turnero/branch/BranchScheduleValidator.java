@@ -20,20 +20,20 @@ class BranchScheduleValidator {
         EnumSet<DayOfWeek> seenDays = EnumSet.noneOf(DayOfWeek.class);
         List<Branch.OpeningIntervalValue> values = new ArrayList<>();
         for (BranchScheduleRequest daySchedule : schedule) {
-            if (!seenDays.add(daySchedule.dayOfWeek())) {
+            if (!seenDays.add(daySchedule.day())) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Schedule contains duplicated days");
             }
 
-            List<OpeningIntervalRequest> intervals = daySchedule.intervals() == null
+            List<OpeningIntervalRequest> intervals = daySchedule.timeRanges() == null
                     ? List.of()
-                    : daySchedule.intervals().stream()
-                            .sorted(Comparator.comparing(OpeningIntervalRequest::opensAt))
+                    : daySchedule.timeRanges().stream()
+                            .sorted(Comparator.comparing(OpeningIntervalRequest::start))
                             .toList();
-            validateIntervals(daySchedule.dayOfWeek(), intervals);
+            validateIntervals(daySchedule.day(), intervals);
             intervals.forEach(interval -> values.add(new Branch.OpeningIntervalValue(
-                    daySchedule.dayOfWeek(),
-                    interval.opensAt(),
-                    interval.closesAt()
+                    daySchedule.day(),
+                    interval.start(),
+                    interval.end()
             )));
         }
         return values;
@@ -42,10 +42,13 @@ class BranchScheduleValidator {
     private void validateIntervals(DayOfWeek dayOfWeek, List<OpeningIntervalRequest> intervals) {
         OpeningIntervalRequest previous = null;
         for (OpeningIntervalRequest interval : intervals) {
-            if (!interval.opensAt().isBefore(interval.closesAt())) {
+            if (!interval.start().isBefore(interval.end())) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Schedule interval start must be before end");
             }
-            if (previous != null && interval.opensAt().isBefore(previous.closesAt())) {
+            if (previous != null && interval.start().equals(previous.start()) && interval.end().equals(previous.end())) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Schedule contains duplicated intervals for " + dayOfWeek);
+            }
+            if (previous != null && interval.start().isBefore(previous.end())) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Schedule intervals overlap for " + dayOfWeek);
             }
             previous = interval;

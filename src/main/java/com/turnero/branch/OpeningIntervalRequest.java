@@ -1,13 +1,16 @@
 package com.turnero.branch;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalTime;
 
 public record OpeningIntervalRequest(
         @NotNull
-        LocalTime opensAt,
+        @JsonAlias("opensAt")
+        LocalTime start,
 
         @NotNull
-        LocalTime closesAt
+        @JsonAlias("closesAt")
+        LocalTime end
 ) {
 }

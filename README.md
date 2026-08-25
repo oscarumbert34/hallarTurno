@@ -283,7 +283,25 @@ Endpoints protegidos de sucursales:
 - `PUT /api/v1/branches/{id}`
 - `DELETE /api/v1/branches/{id}`
 
-Los horarios de sucursal se envian como agenda semanal por dia (`MONDAY` a `SUNDAY`) con cero o mas intervalos. Un dia cerrado se representa con `intervals: []` o sin fila de intervalos persistida. Cada intervalo debe cumplir `opensAt < closesAt` y no puede solaparse con otro intervalo del mismo dia.
+Los horarios de sucursal se envian como agenda semanal por dia (`MONDAY` a `SUNDAY`) con cero o mas franjas en `timeRanges`. Un dia cerrado se representa con `timeRanges: []` o sin fila de franjas persistida. Cada franja debe cumplir `start < end`, no puede duplicarse ni solaparse con otra franja del mismo dia, y la API devuelve las franjas ordenadas por hora de inicio. Para compatibilidad, los requests existentes con `dayOfWeek`, `intervals`, `opensAt` y `closesAt` siguen siendo aceptados.
+
+Ejemplo:
+
+```json
+{
+  "day": "MONDAY",
+  "timeRanges": [
+    {
+      "start": "09:00",
+      "end": "13:00"
+    },
+    {
+      "start": "16:00",
+      "end": "20:00"
+    }
+  ]
+}
+```
 
 Endpoints protegidos de servicios reservables:
 
@@ -302,7 +320,7 @@ Endpoints protegidos de recursos reservables:
 - `PUT /api/v1/resources/{id}`
 - `DELETE /api/v1/resources/{id}`
 
-Los recursos reservables representan empleados inicialmente, pero el modelo soporta `EMPLOYEE`, `ROOM` y `EQUIPMENT`. Cada recurso pertenece a una sucursal, puede realizar varios servicios, y un servicio puede estar asociado a varios recursos. Los horarios laborales semanales y las ausencias se guardan en tablas consultables por dia/fecha y rango horario. No se permiten servicios de otro negocio ni servicios especificos de otra sucursal.
+Los recursos reservables representan empleados inicialmente, pero el modelo soporta `EMPLOYEE`, `ROOM` y `EQUIPMENT`. Cada recurso pertenece a una sucursal, puede realizar varios servicios, y un servicio puede estar asociado a varios recursos. Los horarios laborales semanales usan el mismo contrato `day` + `timeRanges` + `start`/`end`; los requests anteriores con `dayOfWeek`, `intervals`, `startsAt` y `endsAt` siguen siendo aceptados. Las ausencias se guardan por fecha y rango horario, y actuan como bloqueos sobre las franjas disponibles. No se permiten servicios de otro negocio ni servicios especificos de otra sucursal. El modelo de franjas se mantiene como filas independientes para poder extender luego recursos en multiples sucursales y validar solapamientos entre sedes sin redisenar el contrato.
 
 Disponibilidad:
 

@@ -1,5 +1,6 @@
 package com.turnero.branch;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -46,6 +47,7 @@ public record BranchRequest(
         BranchStatus status,
 
         @Valid
+        @JsonAlias("schedule")
         List<BranchScheduleRequest> weeklySchedule
 ) {
 }

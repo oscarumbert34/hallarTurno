@@ -23,20 +23,21 @@ class ResourceAvailabilityValidator {
         EnumSet<DayOfWeek> seenDays = EnumSet.noneOf(DayOfWeek.class);
         List<BookableResource.WorkingIntervalValue> values = new ArrayList<>();
         for (ResourceScheduleRequest daySchedule : schedule) {
-            if (!seenDays.add(daySchedule.dayOfWeek())) {
+            if (!seenDays.add(daySchedule.day())) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Resource schedule contains duplicated days");
             }
-            List<ResourceIntervalRequest> intervals = daySchedule.intervals() == null
+            List<ResourceIntervalRequest> intervals = daySchedule.timeRanges() == null
                     ? List.of()
-                    : daySchedule.intervals().stream()
-                            .sorted(Comparator.comparing(ResourceIntervalRequest::startsAt))
+                    : daySchedule.timeRanges().stream()
+                            .sorted(Comparator.comparing(ResourceIntervalRequest::start))
                             .toList();
             validateIntervals(intervals, "Resource schedule interval start must be before end",
-                    "Resource schedule intervals overlap for " + daySchedule.dayOfWeek());
+                    "Resource schedule contains duplicated intervals for " + daySchedule.day(),
+                    "Resource schedule intervals overlap for " + daySchedule.day());
             intervals.forEach(interval -> values.add(new BookableResource.WorkingIntervalValue(
-                    daySchedule.dayOfWeek(),
-                    interval.startsAt(),
-                    interval.endsAt()
+                    daySchedule.day(),
+                    interval.start(),
+                    interval.end()
             )));
         }
         return values;
@@ -64,13 +65,21 @@ class ResourceAvailabilityValidator {
         return values;
     }
 
-    private void validateIntervals(List<ResourceIntervalRequest> intervals, String invalidMessage, String overlapMessage) {
+    private void validateIntervals(
+            List<ResourceIntervalRequest> intervals,
+            String invalidMessage,
+            String duplicateMessage,
+            String overlapMessage
+    ) {
         ResourceIntervalRequest previous = null;
         for (ResourceIntervalRequest interval : intervals) {
-            if (!interval.startsAt().isBefore(interval.endsAt())) {
+            if (!interval.start().isBefore(interval.end())) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, invalidMessage);
             }
-            if (previous != null && interval.startsAt().isBefore(previous.endsAt())) {
+            if (previous != null && interval.start().equals(previous.start()) && interval.end().equals(previous.end())) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, duplicateMessage);
+            }
+            if (previous != null && interval.start().isBefore(previous.end())) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, overlapMessage);
             }
             previous = interval;

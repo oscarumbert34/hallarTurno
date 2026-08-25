@@ -1,5 +1,6 @@
 package com.turnero.employee;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -19,6 +20,7 @@ public record BookableResourceRequest(
         Set<UUID> serviceOfferingIds,
 
         @Valid
+        @JsonAlias("schedule")
         List<ResourceScheduleRequest> weeklySchedule,
 
         @Valid
