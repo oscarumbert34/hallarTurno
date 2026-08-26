@@ -213,6 +213,71 @@ class BookingControllerIntegrationTests {
     }
 
     @Test
+    void businessBookingListCanBeFilteredByResourceAndServiceOffering() throws Exception {
+        Fixture fixture = fixture("booking-resource-service-filter");
+        String secondResourceId = createResource(
+                fixture.ownerToken(),
+                fixture.branchId(),
+                "Recurso booking-resource-service-filter-other",
+                fixture.serviceOfferingId()
+        );
+        Fixture secondResource = new Fixture(
+                "booking-resource-service-filter",
+                fixture.ownerToken(),
+                fixture.customerToken(),
+                fixture.businessId(),
+                fixture.branchId(),
+                fixture.serviceOfferingId(),
+                secondResourceId
+        );
+        String secondOfferingId = createOffering(
+                fixture.ownerToken(),
+                fixture.businessId(),
+                fixture.branchId(),
+                "Servicio booking-resource-service-filter-other"
+        );
+        String thirdResourceId = createResource(
+                fixture.ownerToken(),
+                fixture.branchId(),
+                "Recurso booking-resource-service-filter-third",
+                secondOfferingId
+        );
+        Fixture secondService = new Fixture(
+                "booking-resource-service-filter-other",
+                fixture.ownerToken(),
+                fixture.customerToken(),
+                fixture.businessId(),
+                fixture.branchId(),
+                secondOfferingId,
+                thirdResourceId
+        );
+        String firstBookingId = createBooking(fixture.customerToken(), fixture, "2026-09-07", "09:00");
+        String secondResourceBookingId = createBooking(secondResource.customerToken(), secondResource, "2026-09-07", "09:00");
+        String secondServiceBookingId = createBooking(secondService.customerToken(), secondService, "2026-09-07", "09:30");
+
+        mockMvc.perform(get("/api/v1/businesses/" + fixture.businessId() + "/bookings")
+                        .param("date", "2026-09-07")
+                        .param("resourceId", secondResourceId)
+                        .header("Authorization", "Bearer " + fixture.ownerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.results.length()").value(1))
+                .andExpect(jsonPath("$.results[0].id").value(secondResourceBookingId))
+                .andExpect(jsonPath("$.results[0].resourceId").value(secondResourceId));
+
+        mockMvc.perform(get("/api/v1/businesses/" + fixture.businessId() + "/bookings")
+                        .param("serviceOfferingId", secondOfferingId)
+                        .header("Authorization", "Bearer " + fixture.ownerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.results.length()").value(1))
+                .andExpect(jsonPath("$.results[0].id").value(secondServiceBookingId))
+                .andExpect(jsonPath("$.results[0].serviceOfferingId").value(secondOfferingId));
+
+        assertThat(firstBookingId).isNotIn(secondResourceBookingId, secondServiceBookingId);
+    }
+
+    @Test
     void unavailableBookingReturnsConflict() throws Exception {
         Fixture fixture = fixture("booking-conflict");
         createBooking(fixture.customerToken(), fixture, "09:00");

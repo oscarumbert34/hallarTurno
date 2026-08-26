@@ -368,12 +368,12 @@ Endpoints protegidos de reservas:
 - `POST /api/v1/bookings/{id}/cancel`
 - `GET /api/v1/businesses/{businessId}/bookings`
 
-Las reservas requieren `customerName` y `customerPhone`, se crean como `CONFIRMED`, guardan snapshot de contacto, servicio, recurso, duracion, precio y moneda, y no se borran fisicamente. La cancelacion minima permite cancelar al cliente de la reserva, al owner del negocio o a `ADMIN`. El listado por negocio es paginado (`page`, `size`; maximo `50`), admite filtros opcionales `date` y `branchId`, y solo lo puede consultar el owner del negocio o `ADMIN`. Devuelve contrato estable con `page`, `size`, `maxSize`, `totalElements`, `totalPages`, `hasMore`, `sort` y `results`; el orden es cronologico ascendente por `startsAt` y luego `id` (`startsAt:asc,id:asc`). Si se informa `date`, el filtro aplica sobre la fecha local del turno en la zona horaria de la sucursal. Para evitar doble booking se revalida disponibilidad dentro de la transaccion y PostgreSQL aplica una constraint de exclusion por recurso y rango horario para reservas activas; cuando el slot ya fue tomado, la API responde `409 Conflict`.
+Las reservas requieren `customerName` y `customerPhone`, se crean como `CONFIRMED`, guardan snapshot de contacto, servicio, recurso, duracion, precio y moneda, y no se borran fisicamente. La cancelacion minima permite cancelar al cliente de la reserva, al owner del negocio o a `ADMIN`. El listado por negocio es paginado (`page`, `size`; maximo `50`), admite filtros opcionales `date`, `branchId`, `resourceId` y `serviceOfferingId`, y solo lo puede consultar el owner del negocio o `ADMIN`. Devuelve contrato estable con `page`, `size`, `maxSize`, `totalElements`, `totalPages`, `hasMore`, `sort` y `results`; el orden es cronologico ascendente por `startsAt` y luego `id` (`startsAt:asc,id:asc`). Si se informa `date`, el filtro aplica sobre la fecha local del turno en la zona horaria de la sucursal. Para evitar doble booking se revalida disponibilidad dentro de la transaccion y PostgreSQL aplica una constraint de exclusion por recurso y rango horario para reservas activas; cuando el slot ya fue tomado, la API responde `409 Conflict`.
 
-Ejemplo de listado filtrado por fecha y sucursal:
+Ejemplo de listado filtrado por fecha, sucursal, recurso y servicio:
 
 ```text
-GET /api/v1/businesses/{businessId}/bookings?date=2026-08-25&branchId={branchId}&page=0&size=20
+GET /api/v1/businesses/{businessId}/bookings?date=2026-08-25&branchId={branchId}&resourceId={resourceId}&serviceOfferingId={serviceOfferingId}&page=0&size=20
 ```
 
 Ejemplo de creacion de reserva:
