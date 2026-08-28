@@ -166,6 +166,22 @@ class AvailabilityServiceTests {
     }
 
     @Test
+    void longServiceUsesGranularityToFindFirstContiguousSlotAfterBooking() {
+        arrangeBranchAndService(90, List.of(open(DayOfWeek.MONDAY, "09:00", "13:00")), null);
+        BookableResource resource = resource("Ana", List.of(work(DayOfWeek.MONDAY, "09:00", "13:00")), List.of());
+        Booking booking = booking(resource, "09:00", "11:00");
+        arrangeResources(List.of(resource), List.of(booking));
+
+        List<LocalTime> starts = availabilityService.findAvailableSlots(branchId, serviceId, MONDAY).stream()
+                .map(AvailabilitySlotResponse::startsAt)
+                .toList();
+
+        assertThat(starts).containsExactly(
+                LocalTime.of(11, 0)
+        );
+    }
+
+    @Test
     void serviceDurationsProduceExpectedSlotsAtClosingBoundary() {
         assertStartsForDuration(30, LocalTime.of(9, 0), LocalTime.of(9, 30));
         assertStartsForDuration(45, LocalTime.of(9, 0));

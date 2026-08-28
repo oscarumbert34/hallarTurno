@@ -174,10 +174,15 @@ public class AvailabilityService {
 
         while (!cursor.plus(serviceDuration).isAfter(latestEnd)) {
             TimeRange slot = new TimeRange(cursor, cursor.plus(serviceDuration));
-            if (blockedRanges.stream().noneMatch(slot::overlaps)) {
+            Optional<TimeRange> overlappingBlock = blockedRanges.stream()
+                    .filter(slot::overlaps)
+                    .min(Comparator.comparing(TimeRange::endsAt));
+            if (overlappingBlock.isEmpty()) {
                 slots.add(slot);
+                cursor = cursor.plus(slotStep(serviceDuration));
+            } else {
+                cursor = overlappingBlock.get().endsAt();
             }
-            cursor = cursor.plus(slotStep(serviceDuration));
         }
         return slots;
     }
