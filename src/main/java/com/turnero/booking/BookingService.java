@@ -177,7 +177,7 @@ public class BookingService {
             LocalDate date,
             UUID branchId
     ) {
-        return findByBusiness(businessId, currentUser, page, size, date, branchId, null, null);
+        return findByBusiness(businessId, currentUser, page, size, date, null, null, branchId, null, null);
     }
 
     @Transactional(readOnly = true)
@@ -187,6 +187,8 @@ public class BookingService {
             int page,
             int size,
             LocalDate date,
+            LocalDate dateFrom,
+            LocalDate dateTo,
             UUID branchId,
             UUID resourceId,
             UUID serviceOfferingId
@@ -197,15 +199,16 @@ public class BookingService {
         Branch branchFilter = findBranchFilter(businessId, branchId);
         BookableResource resourceFilter = findResourceFilter(businessId, resourceId);
         ServiceOffering serviceOfferingFilter = findServiceOfferingFilter(businessId, serviceOfferingId);
-        if (date != null) {
-            return findByBusinessAndDate(
+        OptionalDateRange dateRange = normalizeDateRange(date, dateFrom, dateTo);
+        if (dateRange != null) {
+            return findByBusinessAndDateRange(
                     businessId,
                     branchFilter,
                     resourceFilter,
                     serviceOfferingFilter,
                     page,
                     size,
-                    date
+                    dateRange
             );
         }
         Page<Booking> bookingPage = bookingRepository.findByBusinessIdAndOptionalFiltersOrderByStartsAtAscIdAsc(
@@ -265,14 +268,30 @@ public class BookingService {
         return serviceOffering;
     }
 
-    private BookingPageResponse findByBusinessAndDate(
+    private OptionalDateRange normalizeDateRange(LocalDate date, LocalDate dateFrom, LocalDate dateTo) {
+        if (date != null) {
+            return new OptionalDateRange(date, date);
+        }
+        if (dateFrom == null && dateTo == null) {
+            return null;
+        }
+        if (dateFrom == null || dateTo == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Both dateFrom and dateTo are required for range filtering");
+        }
+        if (dateFrom.isAfter(dateTo)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "dateFrom must be before or equal to dateTo");
+        }
+        return new OptionalDateRange(dateFrom, dateTo);
+    }
+
+    private BookingPageResponse findByBusinessAndDateRange(
             UUID businessId,
             Branch branchFilter,
             BookableResource resourceFilter,
             ServiceOffering serviceOfferingFilter,
             int page,
             int size,
-            LocalDate date
+            OptionalDateRange dateRange
     ) {
         List<Branch> branches = branchFilter == null
                 ? branchRepository.findDistinctByBusinessIdOrderByNameAsc(businessId)
@@ -281,11 +300,11 @@ public class BookingService {
             return emptyPage(page, size);
         }
         Instant startsAtFrom = branches.stream()
-                .map(branch -> dayStart(date, ZoneId.of(branch.getZoneId())))
+                .map(branch -> dayStart(dateRange.from(), ZoneId.of(branch.getZoneId())))
                 .min(Comparator.naturalOrder())
                 .orElseThrow();
         Instant startsAtTo = branches.stream()
-                .map(branch -> dayEnd(date, ZoneId.of(branch.getZoneId())))
+                .map(branch -> dayEnd(dateRange.to(), ZoneId.of(branch.getZoneId())))
                 .max(Comparator.naturalOrder())
                 .orElseThrow();
         List<Booking> candidates = bookingRepository.findByBusinessIdAndDateRangeAndOptionalFiltersOrderByStartsAtAscIdAsc(
@@ -297,7 +316,7 @@ public class BookingService {
                 serviceOfferingFilter == null ? null : serviceOfferingFilter.getId()
         );
         List<BookingResponse> results = candidates.stream()
-                .filter(booking -> startsOnLocalDate(booking, date))
+                .filter(booking -> startsInsideLocalDateRange(booking, dateRange))
                 .map(BookingResponse::from)
                 .toList();
         int fromIndex = (int) Math.min((long) page * size, results.size());
@@ -314,9 +333,18 @@ public class BookingService {
         );
     }
 
+    private boolean startsInsideLocalDateRange(Booking booking, OptionalDateRange dateRange) {
+        LocalDate startsOn = startsOnLocalDate(booking);
+        return !startsOn.isBefore(dateRange.from()) && !startsOn.isAfter(dateRange.to());
+    }
+
     private boolean startsOnLocalDate(Booking booking, LocalDate date) {
+        return startsOnLocalDate(booking).equals(date);
+    }
+
+    private LocalDate startsOnLocalDate(Booking booking) {
         ZoneId branchZoneId = ZoneId.of(booking.getBranch().getZoneId());
-        return LocalDateTime.ofInstant(booking.getStartsAt(), branchZoneId).toLocalDate().equals(date);
+        return LocalDateTime.ofInstant(booking.getStartsAt(), branchZoneId).toLocalDate();
     }
 
     private Instant dayStart(LocalDate date, ZoneId zoneId) {
@@ -382,6 +410,9 @@ public class BookingService {
             return;
         }
         throw new ApiException(HttpStatus.FORBIDDEN, "Booking can only be cancelled by the customer, business owner or an admin");
+    }
+
+    private record OptionalDateRange(LocalDate from, LocalDate to) {
     }
 }
 

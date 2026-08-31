@@ -61,6 +61,8 @@ public class BookingController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(value = MAX_BOOKINGS_PAGE_SIZE, message = "Bookings page size must be at most 50") int size,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(required = false) UUID branchId,
             @RequestParam(required = false) UUID resourceId,
             @RequestParam(required = false) UUID serviceOfferingId,
@@ -72,6 +74,8 @@ public class BookingController {
                 page,
                 size,
                 date,
+                dateFrom,
+                dateTo,
                 branchId,
                 resourceId,
                 serviceOfferingId

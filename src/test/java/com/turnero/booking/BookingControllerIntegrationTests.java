@@ -168,6 +168,43 @@ class BookingControllerIntegrationTests {
     }
 
     @Test
+    void businessBookingListCanBeFilteredByLocalDateRange() throws Exception {
+        Fixture fixture = fixture("booking-date-range-filter");
+        String mondayBookingId = createBooking(fixture.customerToken(), fixture, "2026-09-07", "09:00");
+        String thursdayBookingId = createBooking(fixture.customerToken(), fixture, "2026-09-10", "09:30");
+        String fridayBookingId = createBooking(fixture.customerToken(), fixture, "2026-09-11", "10:00");
+        String nextWeekBookingId = createBooking(fixture.customerToken(), fixture, "2026-09-14", "09:00");
+
+        mockMvc.perform(get("/api/v1/businesses/" + fixture.businessId() + "/bookings")
+                        .param("dateFrom", "2026-09-07")
+                        .param("dateTo", "2026-09-13")
+                        .header("Authorization", "Bearer " + fixture.ownerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.hasMore").value(false))
+                .andExpect(jsonPath("$.sort").value("startsAt:asc,id:asc"))
+                .andExpect(jsonPath("$.results.length()").value(3))
+                .andExpect(jsonPath("$.results[0].id").value(mondayBookingId))
+                .andExpect(jsonPath("$.results[1].id").value(thursdayBookingId))
+                .andExpect(jsonPath("$.results[2].id").value(fridayBookingId));
+
+        assertThat(nextWeekBookingId).isNotIn(mondayBookingId, thursdayBookingId, fridayBookingId);
+    }
+
+    @Test
+    void businessBookingListRejectsInvalidLocalDateRange() throws Exception {
+        Fixture fixture = fixture("booking-invalid-date-range");
+
+        mockMvc.perform(get("/api/v1/businesses/" + fixture.businessId() + "/bookings")
+                        .param("dateFrom", "2026-09-13")
+                        .param("dateTo", "2026-09-07")
+                        .header("Authorization", "Bearer " + fixture.ownerToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("dateFrom must be before or equal to dateTo"));
+    }
+
+    @Test
     void businessBookingListCanBeFilteredByBranch() throws Exception {
         Fixture firstBranch = fixture("booking-branch-filter");
         String secondBranchId = createBranch(
