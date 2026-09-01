@@ -1,0 +1,48 @@
+databaseChangeLog:
+  - changeSet:
+      id: 012-create-business-configurations
+      author: turnero
+      comment: Create per-business feature configuration.
+      changes:
+        - createTable:
+            tableName: business_configurations
+            columns:
+              - column:
+                  name: business_id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_business_configurations
+                    nullable: false
+              - column:
+                  name: weekly_booking_copy_enabled
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: business_configurations
+            baseColumnNames: business_id
+            constraintName: fk_business_configurations_business_id
+            referencedTableName: businesses
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - sql:
+            dbms: postgresql
+            sql: >
+              INSERT INTO business_configurations (business_id, weekly_booking_copy_enabled, created_at, updated_at)
+              SELECT id, false, now(), now()
+              FROM businesses
+      rollback:
+        - dropTable:
+            tableName: business_configurations

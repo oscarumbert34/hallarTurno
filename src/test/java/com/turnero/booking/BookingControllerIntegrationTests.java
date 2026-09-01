@@ -3,15 +3,18 @@ package com.turnero.booking;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -202,6 +205,114 @@ class BookingControllerIntegrationTests {
                         .header("Authorization", "Bearer " + fixture.ownerToken()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("dateFrom must be before or equal to dateTo"));
+    }
+
+    @Test
+    void businessOwnerCanCopyAvailableWeekBookings() throws Exception {
+        Fixture fixture = fixture("booking-copy-week");
+        enableWeeklyBookingCopy(fixture.ownerToken(), fixture.businessId());
+        String mondayBookingId = createBooking(fixture.customerToken(), fixture, "2026-09-07", "09:00");
+        String thursdayBookingId = createBooking(fixture.customerToken(), fixture, "2026-09-10", "09:30");
+
+        mockMvc.perform(post("/api/v1/businesses/" + fixture.businessId() + "/bookings/copy-week")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(copyWeekJson("2026-09-07", "2026-09-14")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sourceWeekStart").value("2026-09-07"))
+                .andExpect(jsonPath("$.targetWeekStart").value("2026-09-14"))
+                .andExpect(jsonPath("$.sourceBookings").value(2))
+                .andExpect(jsonPath("$.createdCount").value(2))
+                .andExpect(jsonPath("$.skippedCount").value(0))
+                .andExpect(jsonPath("$.conflictCount").value(0))
+                .andExpect(jsonPath("$.created[0].sourceBookingId").value(mondayBookingId))
+                .andExpect(jsonPath("$.created[0].date").value("2026-09-14"))
+                .andExpect(jsonPath("$.created[0].startsAt").value("09:00:00"))
+                .andExpect(jsonPath("$.created[1].sourceBookingId").value(thursdayBookingId))
+                .andExpect(jsonPath("$.created[1].date").value("2026-09-17"))
+                .andExpect(jsonPath("$.created[1].startsAt").value("09:30:00"));
+    }
+
+    @Test
+    void businessWeekCopySkipsEquivalentBookingsWithoutDuplicating() throws Exception {
+        Fixture fixture = fixture("booking-copy-week-duplicate");
+        enableWeeklyBookingCopy(fixture.ownerToken(), fixture.businessId());
+        createBooking(fixture.customerToken(), fixture, "2026-09-07", "09:00");
+
+        mockMvc.perform(post("/api/v1/businesses/" + fixture.businessId() + "/bookings/copy-week")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(copyWeekJson("2026-09-07", "2026-09-14")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdCount").value(1));
+
+        mockMvc.perform(post("/api/v1/businesses/" + fixture.businessId() + "/bookings/copy-week")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(copyWeekJson("2026-09-07", "2026-09-14")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sourceBookings").value(1))
+                .andExpect(jsonPath("$.createdCount").value(0))
+                .andExpect(jsonPath("$.skippedCount").value(1))
+                .andExpect(jsonPath("$.conflictCount").value(0))
+                .andExpect(jsonPath("$.skipped[0].reason").value("Equivalent booking already exists"));
+    }
+
+    @Test
+    void businessWeekCopyRejectsDisabledConfiguration() throws Exception {
+        Fixture fixture = fixture("booking-copy-week-disabled");
+        createBooking(fixture.customerToken(), fixture, "2026-09-07", "09:00");
+
+        mockMvc.perform(post("/api/v1/businesses/" + fixture.businessId() + "/bookings/copy-week")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(copyWeekJson("2026-09-07", "2026-09-14")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Weekly booking copy is not enabled for this business"));
+    }
+
+    @Test
+    void businessWeekCopyReportsConflictsExplicitly() throws Exception {
+        Fixture fixture = fixture("booking-copy-week-conflict");
+        enableWeeklyBookingCopy(fixture.ownerToken(), fixture.businessId());
+        String sourceBookingId = createBooking(fixture.customerToken(), fixture, "2026-09-07", "09:00");
+        String secondOfferingId = createOffering(
+                fixture.ownerToken(),
+                fixture.businessId(),
+                fixture.branchId(),
+                "Servicio booking-copy-week-conflict-other"
+        );
+        updateResourceServices(
+                fixture.ownerToken(),
+                fixture.resourceId(),
+                "Recurso " + fixture.prefix(),
+                fixture.serviceOfferingId(),
+                secondOfferingId
+        );
+        Fixture secondService = new Fixture(
+                "booking-copy-week-conflict-other",
+                fixture.ownerToken(),
+                fixture.customerToken(),
+                fixture.businessId(),
+                fixture.branchId(),
+                secondOfferingId,
+                fixture.resourceId()
+        );
+        createBooking(secondService.customerToken(), secondService, "2026-09-14", "09:00");
+
+        mockMvc.perform(post("/api/v1/businesses/" + fixture.businessId() + "/bookings/copy-week")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(copyWeekJson("2026-09-07", "2026-09-14")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sourceBookings").value(1))
+                .andExpect(jsonPath("$.createdCount").value(0))
+                .andExpect(jsonPath("$.skippedCount").value(0))
+                .andExpect(jsonPath("$.conflictCount").value(1))
+                .andExpect(jsonPath("$.conflicts[0].sourceBookingId").value(sourceBookingId))
+                .andExpect(jsonPath("$.conflicts[0].date").value("2026-09-14"))
+                .andExpect(jsonPath("$.conflicts[0].startsAt").value("09:00:00"))
+                .andExpect(jsonPath("$.conflicts[0].reason").value("Slot is not available"));
     }
 
     @Test
@@ -421,6 +532,19 @@ class BookingControllerIntegrationTests {
         return objectMapper.readTree(response).get("id").asText();
     }
 
+    private void enableWeeklyBookingCopy(String token, String businessId) throws Exception {
+        mockMvc.perform(put("/api/v1/businesses/" + businessId + "/configuration")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "weeklyBookingCopyEnabled": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.weeklyBookingCopyEnabled").value(true));
+    }
+
     private String createBranch(String token, String businessId, String name) throws Exception {
         String response = mockMvc.perform(post("/api/v1/businesses/" + businessId + "/branches")
                         .header("Authorization", "Bearer " + token)
@@ -524,6 +648,54 @@ class BookingControllerIntegrationTests {
         return objectMapper.readTree(response).get("id").asText();
     }
 
+    private void updateResourceServices(
+            String token,
+            String resourceId,
+            String name,
+            String... serviceOfferingIds
+    ) throws Exception {
+        mockMvc.perform(put("/api/v1/resources/" + resourceId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(resourceJson(name, serviceOfferingIds)))
+                .andExpect(status().isOk());
+    }
+
+    private String resourceJson(String name, String... serviceOfferingIds) {
+        String serviceIds = Arrays.stream(serviceOfferingIds)
+                .map(id -> "\"" + id + "\"")
+                .collect(Collectors.joining(", "));
+        return """
+                {
+                  "visibleName": "%s",
+                  "type": "EMPLOYEE",
+                  "status": "ACTIVE",
+                  "serviceOfferingIds": [%s],
+                  "weeklySchedule": [
+                    {
+                      "dayOfWeek": "MONDAY",
+                      "intervals": [
+                        {"startsAt": "09:00", "endsAt": "12:00"}
+                      ]
+                    },
+                    {
+                      "dayOfWeek": "THURSDAY",
+                      "intervals": [
+                        {"startsAt": "09:00", "endsAt": "12:00"}
+                      ]
+                    },
+                    {
+                      "dayOfWeek": "FRIDAY",
+                      "intervals": [
+                        {"startsAt": "09:00", "endsAt": "12:00"}
+                      ]
+                    }
+                  ],
+                  "absences": []
+                }
+                """.formatted(name, serviceIds);
+    }
+
     private String bookingJson(Fixture fixture, String startsAt) {
         return bookingJson(fixture, "2026-09-07", startsAt);
     }
@@ -547,6 +719,15 @@ class BookingControllerIntegrationTests {
                 startsAt,
                 fixture.prefix()
         );
+    }
+
+    private String copyWeekJson(String sourceWeekStart, String targetWeekStart) {
+        return """
+                {
+                  "sourceWeekStart": "%s",
+                  "targetWeekStart": "%s"
+                }
+                """.formatted(sourceWeekStart, targetWeekStart);
     }
 
     private record Fixture(

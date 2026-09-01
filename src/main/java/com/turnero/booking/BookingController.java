@@ -55,6 +55,15 @@ public class BookingController {
         return bookingService.cancel(id, currentUser);
     }
 
+    @PostMapping("/businesses/{businessId}/bookings/copy-week")
+    public WeeklyBookingCopyResponse copyWeek(
+            @PathVariable UUID businessId,
+            @Valid @RequestBody WeeklyBookingCopyRequest request,
+            @AuthenticationPrincipal AuthenticatedUser currentUser
+    ) {
+        return bookingService.copyWeek(businessId, currentUser, request);
+    }
+
     @GetMapping("/businesses/{businessId}/bookings")
     public BookingPageResponse findByBusiness(
             @PathVariable UUID businessId,

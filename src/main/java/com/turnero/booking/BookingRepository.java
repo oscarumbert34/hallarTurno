@@ -138,4 +138,13 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             @Param("resourceId") UUID resourceId,
             @Param("serviceOfferingId") UUID serviceOfferingId
     );
+
+    boolean existsByBusinessIdAndBranchIdAndResourceIdAndServiceOfferingIdAndStartsAtAndStatusIn(
+            UUID businessId,
+            UUID branchId,
+            UUID resourceId,
+            UUID serviceOfferingId,
+            Instant startsAt,
+            Collection<BookingStatus> statuses
+    );
 }

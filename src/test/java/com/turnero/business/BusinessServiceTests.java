@@ -22,12 +22,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 class BusinessServiceTests {
 
     private final BusinessRepository businessRepository = org.mockito.Mockito.mock(BusinessRepository.class);
+    private final BusinessConfigurationRepository configurationRepository = org.mockito.Mockito.mock(BusinessConfigurationRepository.class);
     private final UserRepository userRepository = org.mockito.Mockito.mock(UserRepository.class);
     private final BusinessProperties properties = new BusinessProperties();
     private final SlugGenerator slugGenerator = new SlugGenerator();
     private final OwnershipGuard ownershipGuard = new OwnershipGuard();
     private final BusinessService businessService = new BusinessService(
             businessRepository,
+            configurationRepository,
             userRepository,
             properties,
             slugGenerator,
@@ -50,6 +52,7 @@ class BusinessServiceTests {
 
         ArgumentCaptor<Business> captor = ArgumentCaptor.forClass(Business.class);
         verify(businessRepository).saveAndFlush(captor.capture());
+        verify(configurationRepository).saveAndFlush(any(BusinessConfiguration.class));
         assertThat(captor.getValue().getOwner().getId()).isEqualTo(ownerId);
         assertThat(response.slug()).isEqualTo("cafe-central-2");
         assertThat(response.name()).isEqualTo("Cafe Central");

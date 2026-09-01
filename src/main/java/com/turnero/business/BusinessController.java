@@ -58,6 +58,23 @@ public class BusinessController {
         return this.businessService.update(id, request, currentUser);
     }
 
+    @GetMapping("/{id}/configuration")
+    BusinessConfigurationResponse getConfiguration(
+            @PathVariable final UUID id,
+            @AuthenticationPrincipal final AuthenticatedUser currentUser
+    ) {
+        return this.businessService.getConfiguration(id, currentUser);
+    }
+
+    @PutMapping("/{id}/configuration")
+    BusinessConfigurationResponse updateConfiguration(
+            @PathVariable final UUID id,
+            @Valid @RequestBody final BusinessConfigurationRequest request,
+            @AuthenticationPrincipal final AuthenticatedUser currentUser
+    ) {
+        return this.businessService.updateConfiguration(id, request, currentUser);
+    }
+
     @DeleteMapping("/{id}")
     ResponseEntity<Void> delete(
             @PathVariable final UUID id,

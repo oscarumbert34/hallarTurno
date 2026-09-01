@@ -6,6 +6,8 @@ import com.turnero.availability.AvailabilitySlotResponse;
 import com.turnero.branch.Branch;
 import com.turnero.branch.BranchRepository;
 import com.turnero.business.Business;
+import com.turnero.business.BusinessConfiguration;
+import com.turnero.business.BusinessConfigurationRepository;
 import com.turnero.business.BusinessRepository;
 import com.turnero.common.ApiException;
 import com.turnero.employee.BookableResource;
@@ -22,9 +24,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,11 +46,17 @@ public class BookingService {
 
     private static final Logger log = LoggerFactory.getLogger(BookingService.class);
     private static final int MAX_PAGE_SIZE = 50;
+    private static final int MAX_WEEK_COPY_BOOKINGS = 200;
     private static final String SORT_ORDER = "startsAt:asc,id:asc";
+    private static final Set<BookingStatus> COPYABLE_BOOKING_STATUSES = Set.of(
+            BookingStatus.PENDING,
+            BookingStatus.CONFIRMED
+    );
 
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final BusinessRepository businessRepository;
+    private final BusinessConfigurationRepository businessConfigurationRepository;
     private final BranchRepository branchRepository;
     private final ServiceOfferingRepository serviceOfferingRepository;
     private final BookableResourceRepository resourceRepository;
@@ -57,6 +69,7 @@ public class BookingService {
             BookingRepository bookingRepository,
             UserRepository userRepository,
             BusinessRepository businessRepository,
+            BusinessConfigurationRepository businessConfigurationRepository,
             BranchRepository branchRepository,
             ServiceOfferingRepository serviceOfferingRepository,
             BookableResourceRepository resourceRepository,
@@ -68,6 +81,7 @@ public class BookingService {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.businessRepository = businessRepository;
+        this.businessConfigurationRepository = businessConfigurationRepository;
         this.branchRepository = branchRepository;
         this.serviceOfferingRepository = serviceOfferingRepository;
         this.resourceRepository = resourceRepository;
@@ -161,6 +175,74 @@ public class BookingService {
         assertCanCancel(booking, currentUser);
         booking.cancel(cancelledBy, Instant.now(clock));
         return BookingResponse.from(booking);
+    }
+
+    @Transactional
+    public WeeklyBookingCopyResponse copyWeek(
+            UUID businessId,
+            AuthenticatedUser currentUser,
+            WeeklyBookingCopyRequest request
+    ) {
+        Business business = businessRepository.findById(businessId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Business not found"));
+        ownershipGuard.requireOwnerOrAdmin(business, currentUser, "Bookings can only be copied by the business owner or an admin");
+        BusinessConfiguration configuration = businessConfigurationRepository.findById(businessId)
+                .orElseGet(() -> businessConfigurationRepository.save(BusinessConfiguration.createDefault(business)));
+        if (!configuration.isWeeklyBookingCopyEnabled()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Weekly booking copy is not enabled for this business");
+        }
+        if (request.sourceWeekStart().equals(request.targetWeekStart())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "targetWeekStart must be different from sourceWeekStart");
+        }
+        if (request.sourceWeekStart().getDayOfWeek() != request.targetWeekStart().getDayOfWeek()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "sourceWeekStart and targetWeekStart must be the same day of week");
+        }
+
+        Branch branchFilter = findBranchFilter(businessId, request.branchId());
+        BookableResource resourceFilter = findResourceFilter(businessId, request.resourceId());
+        ServiceOffering serviceOfferingFilter = findServiceOfferingFilter(businessId, request.serviceOfferingId());
+        OptionalDateRange sourceWeek = new OptionalDateRange(
+                request.sourceWeekStart(),
+                request.sourceWeekStart().plusDays(6)
+        );
+        List<Booking> sourceBookings = findBookingEntitiesByLocalDateRange(
+                businessId,
+                branchFilter,
+                resourceFilter,
+                serviceOfferingFilter,
+                sourceWeek
+        ).stream()
+                .filter(booking -> COPYABLE_BOOKING_STATUSES.contains(booking.getStatus()))
+                .toList();
+        if (sourceBookings.size() > MAX_WEEK_COPY_BOOKINGS) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Weekly copy supports at most 200 source bookings");
+        }
+
+        List<WeeklyBookingCopyCreated> created = new ArrayList<>();
+        List<WeeklyBookingCopySkipped> skipped = new ArrayList<>();
+        List<WeeklyBookingCopyConflict> conflicts = new ArrayList<>();
+        for (Booking source : sourceBookings) {
+            copyBookingToTargetWeek(
+                    source,
+                    request.sourceWeekStart(),
+                    request.targetWeekStart(),
+                    created,
+                    skipped,
+                    conflicts
+            );
+        }
+
+        return new WeeklyBookingCopyResponse(
+                request.sourceWeekStart(),
+                request.targetWeekStart(),
+                sourceBookings.size(),
+                created.size(),
+                skipped.size(),
+                conflicts.size(),
+                created,
+                skipped,
+                conflicts
+        );
     }
 
     @Transactional(readOnly = true)
@@ -293,11 +375,42 @@ public class BookingService {
             int size,
             OptionalDateRange dateRange
     ) {
+        List<Booking> candidates = findBookingEntitiesByLocalDateRange(
+                businessId,
+                branchFilter,
+                resourceFilter,
+                serviceOfferingFilter,
+                dateRange
+        );
+        List<BookingResponse> results = candidates.stream()
+                .map(BookingResponse::from)
+                .toList();
+        int fromIndex = (int) Math.min((long) page * size, results.size());
+        int toIndex = Math.min(fromIndex + size, results.size());
+        return new BookingPageResponse(
+                page,
+                size,
+                MAX_PAGE_SIZE,
+                results.size(),
+                (int) Math.ceil((double) results.size() / size),
+                toIndex < results.size(),
+                SORT_ORDER,
+                results.subList(fromIndex, toIndex)
+        );
+    }
+
+    private List<Booking> findBookingEntitiesByLocalDateRange(
+            UUID businessId,
+            Branch branchFilter,
+            BookableResource resourceFilter,
+            ServiceOffering serviceOfferingFilter,
+            OptionalDateRange dateRange
+    ) {
         List<Branch> branches = branchFilter == null
                 ? branchRepository.findDistinctByBusinessIdOrderByNameAsc(businessId)
                 : List.of(branchFilter);
         if (branches.isEmpty()) {
-            return emptyPage(page, size);
+            return List.of();
         }
         Instant startsAtFrom = branches.stream()
                 .map(branch -> dayStart(dateRange.from(), ZoneId.of(branch.getZoneId())))
@@ -315,22 +428,9 @@ public class BookingService {
                 resourceFilter == null ? null : resourceFilter.getId(),
                 serviceOfferingFilter == null ? null : serviceOfferingFilter.getId()
         );
-        List<BookingResponse> results = candidates.stream()
+        return candidates.stream()
                 .filter(booking -> startsInsideLocalDateRange(booking, dateRange))
-                .map(BookingResponse::from)
                 .toList();
-        int fromIndex = (int) Math.min((long) page * size, results.size());
-        int toIndex = Math.min(fromIndex + size, results.size());
-        return new BookingPageResponse(
-                page,
-                size,
-                MAX_PAGE_SIZE,
-                results.size(),
-                (int) Math.ceil((double) results.size() / size),
-                toIndex < results.size(),
-                SORT_ORDER,
-                results.subList(fromIndex, toIndex)
-        );
     }
 
     private boolean startsInsideLocalDateRange(Booking booking, OptionalDateRange dateRange) {
@@ -345,6 +445,119 @@ public class BookingService {
     private LocalDate startsOnLocalDate(Booking booking) {
         ZoneId branchZoneId = ZoneId.of(booking.getBranch().getZoneId());
         return LocalDateTime.ofInstant(booking.getStartsAt(), branchZoneId).toLocalDate();
+    }
+
+    private void copyBookingToTargetWeek(
+            Booking source,
+            LocalDate sourceWeekStart,
+            LocalDate targetWeekStart,
+            List<WeeklyBookingCopyCreated> created,
+            List<WeeklyBookingCopySkipped> skipped,
+            List<WeeklyBookingCopyConflict> conflicts
+    ) {
+        ZoneId zoneId = ZoneId.of(source.getBranch().getZoneId());
+        LocalDate sourceDate = startsOnLocalDate(source);
+        LocalTime sourceTime = LocalDateTime.ofInstant(source.getStartsAt(), zoneId).toLocalTime();
+        long daysFromSourceWeekStart = ChronoUnit.DAYS.between(sourceWeekStart, sourceDate);
+        LocalDate targetDate = targetWeekStart.plusDays(daysFromSourceWeekStart);
+        Instant targetStartsAt = LocalDateTime.of(targetDate, sourceTime).atZone(zoneId).toInstant();
+        Instant targetEndsAt = LocalDateTime.of(targetDate, sourceTime)
+                .plus(Duration.ofMinutes(source.getDurationMinutesSnapshot()))
+                .atZone(zoneId)
+                .toInstant();
+
+        if (hasEquivalentActiveBooking(source, targetStartsAt)) {
+            skipped.add(toSkipped(source, targetDate, sourceTime, "Equivalent booking already exists"));
+            return;
+        }
+        if (!isSlotAvailable(source, targetDate, sourceTime)) {
+            conflicts.add(toConflict(source, targetDate, sourceTime, "Slot is not available"));
+            return;
+        }
+
+        Booking copied = Booking.create(
+                source.getBranch(),
+                source.getBusiness(),
+                source.getCustomer(),
+                source.getServiceOffering(),
+                source.getResource(),
+                targetStartsAt,
+                targetEndsAt,
+                source.getServiceNameSnapshot(),
+                source.getResourceNameSnapshot(),
+                source.getCustomerNameSnapshot(),
+                source.getCustomerPhoneSnapshot(),
+                source.getDurationMinutesSnapshot(),
+                source.getPriceSnapshot(),
+                source.getCurrencySnapshot(),
+                source.getStatus()
+        );
+        Booking saved = bookingRepository.save(copied);
+        created.add(new WeeklyBookingCopyCreated(
+                source.getId(),
+                saved.getId(),
+                targetDate,
+                sourceTime,
+                source.getBranch().getId(),
+                source.getResource().getId(),
+                source.getServiceOffering().getId()
+        ));
+    }
+
+    private boolean hasEquivalentActiveBooking(Booking source, Instant targetStartsAt) {
+        return bookingRepository.existsByBusinessIdAndBranchIdAndResourceIdAndServiceOfferingIdAndStartsAtAndStatusIn(
+                source.getBusiness().getId(),
+                source.getBranch().getId(),
+                source.getResource().getId(),
+                source.getServiceOffering().getId(),
+                targetStartsAt,
+                COPYABLE_BOOKING_STATUSES
+        );
+    }
+
+    private boolean isSlotAvailable(Booking source, LocalDate targetDate, LocalTime sourceTime) {
+        return availabilityService.findAvailableSlots(
+                        source.getBranch().getId(),
+                        source.getServiceOffering().getId(),
+                        targetDate,
+                        source.getResource().getId()
+                ).stream()
+                .anyMatch(slot -> slot.startsAt().equals(sourceTime)
+                        && slot.resourceId().equals(source.getResource().getId()));
+    }
+
+    private WeeklyBookingCopySkipped toSkipped(
+            Booking source,
+            LocalDate targetDate,
+            LocalTime startsAt,
+            String reason
+    ) {
+        return new WeeklyBookingCopySkipped(
+                source.getId(),
+                targetDate,
+                startsAt,
+                source.getBranch().getId(),
+                source.getResource().getId(),
+                source.getServiceOffering().getId(),
+                reason
+        );
+    }
+
+    private WeeklyBookingCopyConflict toConflict(
+            Booking source,
+            LocalDate targetDate,
+            LocalTime startsAt,
+            String reason
+    ) {
+        return new WeeklyBookingCopyConflict(
+                source.getId(),
+                targetDate,
+                startsAt,
+                source.getBranch().getId(),
+                source.getResource().getId(),
+                source.getServiceOffering().getId(),
+                reason
+        );
     }
 
     private Instant dayStart(LocalDate date, ZoneId zoneId) {

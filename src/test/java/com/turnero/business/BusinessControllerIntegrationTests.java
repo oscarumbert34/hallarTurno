@@ -128,6 +128,30 @@ class BusinessControllerIntegrationTests {
     }
 
     @Test
+    void ownerCanReadAndUpdateBusinessConfiguration() throws Exception {
+        String token = registerAndGetToken("owner-configuration@example.com", "BUSINESS");
+        String businessId = createBusiness(token, "Configuracion Centro");
+
+        mockMvc.perform(get("/api/v1/businesses/" + businessId + "/configuration")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.businessId").value(businessId))
+                .andExpect(jsonPath("$.weeklyBookingCopyEnabled").value(false));
+
+        mockMvc.perform(put("/api/v1/businesses/" + businessId + "/configuration")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "weeklyBookingCopyEnabled": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.businessId").value(businessId))
+                .andExpect(jsonPath("$.weeklyBookingCopyEnabled").value(true));
+    }
+
+    @Test
     void slugIsUniqueForCollidingBusinessNames() throws Exception {
         String token = registerAndGetToken("slug-owner@example.com", "BUSINESS");
 

@@ -274,7 +274,38 @@ Endpoints protegidos de negocios:
 - `POST /api/v1/businesses`
 - `GET /api/v1/businesses/{id}`
 - `PUT /api/v1/businesses/{id}`
+- `GET /api/v1/businesses/{id}/configuration`
+- `PUT /api/v1/businesses/{id}/configuration`
 - `DELETE /api/v1/businesses/{id}`
+
+Cada negocio tiene una configuracion protegida para features del panel. Actualmente expone `weeklyBookingCopyEnabled`, que indica si el front debe mostrar la accion de copiar una semana de reservas y tambien habilita el endpoint `copy-week` en backend.
+
+Ejemplo de lectura de configuracion:
+
+```text
+GET /api/v1/businesses/{businessId}/configuration
+```
+
+Respuesta:
+
+```json
+{
+  "businessId": "8778f5cf-83e8-41fb-9043-83e67673650a",
+  "weeklyBookingCopyEnabled": true
+}
+```
+
+Ejemplo de actualizacion:
+
+```text
+PUT /api/v1/businesses/{businessId}/configuration
+```
+
+```json
+{
+  "weeklyBookingCopyEnabled": true
+}
+```
 
 Endpoints protegidos de sucursales:
 
@@ -366,6 +397,7 @@ Endpoints protegidos de reservas:
 - `POST /api/v1/public/bookings` para reservas publicas sin sesion
 - `POST /api/v1/bookings` para reservas autenticadas
 - `POST /api/v1/bookings/{id}/cancel`
+- `POST /api/v1/businesses/{businessId}/bookings/copy-week`
 - `GET /api/v1/businesses/{businessId}/bookings`
 
 Las reservas requieren `customerName` y `customerPhone`, se crean como `CONFIRMED`, guardan snapshot de contacto, servicio, recurso, duracion, precio y moneda, y no se borran fisicamente. La cancelacion minima permite cancelar al cliente de la reserva, al owner del negocio o a `ADMIN`. El listado por negocio es paginado (`page`, `size`; maximo `50`), admite filtros opcionales `date`, `dateFrom`, `dateTo`, `branchId`, `resourceId` y `serviceOfferingId`, y solo lo puede consultar el owner del negocio o `ADMIN`. Devuelve contrato estable con `page`, `size`, `maxSize`, `totalElements`, `totalPages`, `hasMore`, `sort` y `results`; el orden es cronologico ascendente por `startsAt` y luego `id` (`startsAt:asc,id:asc`). Si se informa `date`, el filtro aplica sobre la fecha local del turno en la zona horaria de la sucursal. Para rangos, `dateFrom` y `dateTo` deben enviarse juntos y son inclusivos. Para evitar doble booking se revalida disponibilidad dentro de la transaccion y PostgreSQL aplica una constraint de exclusion por recurso y rango horario para reservas activas; cuando el slot ya fue tomado, la API responde `409 Conflict`.
@@ -381,6 +413,24 @@ Ejemplo de listado semanal:
 ```text
 GET /api/v1/businesses/{businessId}/bookings?dateFrom=2026-09-07&dateTo=2026-09-13&page=0&size=50
 ```
+
+Ejemplo de copiado semanal:
+
+```text
+POST /api/v1/businesses/{businessId}/bookings/copy-week
+```
+
+```json
+{
+  "sourceWeekStart": "2026-09-07",
+  "targetWeekStart": "2026-09-14",
+  "branchId": "8778f5cf-83e8-41fb-9043-83e67673650a",
+  "resourceId": "cace2721-e7aa-43cf-a0f3-d29b711b247f",
+  "serviceOfferingId": "7f4861a3-45b3-4817-b1ee-3ab7a2136f60"
+}
+```
+
+`branchId`, `resourceId` y `serviceOfferingId` son opcionales. El copiado toma reservas activas (`PENDING` y `CONFIRMED`) desde `sourceWeekStart` hasta seis dias despues, conserva el mismo dia relativo, hora, sucursal, recurso, servicio y datos de contacto, y devuelve `created`, `skipped` y `conflicts`. No duplica reservas equivalentes ya existentes en destino. El negocio debe tener `weeklyBookingCopyEnabled=true`; si no, responde `403 Forbidden`.
 
 Ejemplo de creacion de reserva:
 

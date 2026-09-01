@@ -16,6 +16,7 @@ import java.util.UUID;
 public class BusinessService {
 
     private final BusinessRepository businessRepository;
+    private final BusinessConfigurationRepository configurationRepository;
     private final UserRepository userRepository;
     private final BusinessProperties properties;
     private final SlugGenerator slugGenerator;
@@ -23,12 +24,14 @@ public class BusinessService {
 
     public BusinessService(
             final BusinessRepository businessRepository,
+            final BusinessConfigurationRepository configurationRepository,
             final UserRepository userRepository,
             final BusinessProperties properties,
             final SlugGenerator slugGenerator,
             final OwnershipGuard ownershipGuard
     ) {
         this.businessRepository = businessRepository;
+        this.configurationRepository = configurationRepository;
         this.userRepository = userRepository;
         this.properties = properties;
         this.slugGenerator = slugGenerator;
@@ -50,7 +53,9 @@ public class BusinessService {
                 slug,
                 this.properties.getInitialStatus()
         );
-        return BusinessResponse.from(this.businessRepository.saveAndFlush(business));
+        final Business saved = this.businessRepository.saveAndFlush(business);
+        this.configurationRepository.saveAndFlush(BusinessConfiguration.createDefault(saved));
+        return BusinessResponse.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -89,6 +94,26 @@ public class BusinessService {
     }
 
     @Transactional
+    public BusinessConfigurationResponse getConfiguration(final UUID id, final AuthenticatedUser currentUser) {
+        final Business business = this.findBusiness(id);
+        this.ownershipGuard.requireOwnerOrAdmin(business, currentUser, "Business can only be managed by its owner or an admin");
+        return BusinessConfigurationResponse.from(this.findOrCreateConfiguration(business));
+    }
+
+    @Transactional
+    public BusinessConfigurationResponse updateConfiguration(
+            final UUID id,
+            final BusinessConfigurationRequest request,
+            final AuthenticatedUser currentUser
+    ) {
+        final Business business = this.findBusiness(id);
+        this.ownershipGuard.requireOwnerOrAdmin(business, currentUser, "Business can only be managed by its owner or an admin");
+        final BusinessConfiguration configuration = this.findOrCreateConfiguration(business);
+        configuration.updateWeeklyBookingCopyEnabled(request.weeklyBookingCopyEnabled());
+        return BusinessConfigurationResponse.from(configuration);
+    }
+
+    @Transactional
     public void delete(final UUID id, final AuthenticatedUser currentUser) {
         final Business business = this.findBusiness(id);
         this.ownershipGuard.requireOwnerOrAdmin(business, currentUser, "Business can only be managed by its owner or an admin");
@@ -98,6 +123,11 @@ public class BusinessService {
     private Business findBusiness(final UUID id) {
         return this.businessRepository.findById(id)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Business not found"));
+    }
+
+    private BusinessConfiguration findOrCreateConfiguration(final Business business) {
+        return this.configurationRepository.findById(business.getId())
+                .orElseGet(() -> this.configurationRepository.save(BusinessConfiguration.createDefault(business)));
     }
 
     private String blankToNull(final String value) {
