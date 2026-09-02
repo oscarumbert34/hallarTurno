@@ -53,6 +53,15 @@ Variables de negocios:
 | --- | --- | --- |
 | `BUSINESS_INITIAL_STATUS` | Estado inicial de un negocio creado por su owner. Valores: `ACTIVE`, `PENDING`, `SUSPENDED`. | `ACTIVE` |
 
+Variables Brevo:
+
+| Variable | Uso | Default |
+| --- | --- | --- |
+| `BREVO_API_KEY` | API key para enviar emails transaccionales con Brevo. Si falta, el envio queda deshabilitado. | vacio |
+| `BREVO_FROM_EMAIL` | Email remitente verificado en Brevo. Si falta, el envio queda deshabilitado. | vacio |
+| `BREVO_FROM_NAME` | Nombre remitente para emails transaccionales. | `HallarTurno` |
+| `BREVO_BASE_URL` | URL base de la API de Brevo. | `https://api.brevo.com` |
+
 Variables de disponibilidad:
 
 | Variable | Uso | Default |
@@ -100,6 +109,9 @@ DB_PORT=<puerto-postgresql>
 DB_NAME=<database>
 DB_USERNAME=<usuario>
 DB_PASSWORD=<password>
+BREVO_API_KEY=<api-key-brevo>
+BREVO_FROM_EMAIL=no-reply@hallarturno.com.ar
+BREVO_FROM_NAME=HallarTurno
 ```
 
 ## Ejecucion local

@@ -3,6 +3,7 @@ package com.turnero.auth;
 import com.turnero.business.Business;
 import com.turnero.business.BusinessRepository;
 import com.turnero.common.ApiException;
+import com.turnero.email.UserWelcomeEmailService;
 import com.turnero.user.User;
 import com.turnero.user.UserRepository;
 import com.turnero.user.UserRole;
@@ -12,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class AuthService {
@@ -20,17 +23,20 @@ public class AuthService {
     private final BusinessRepository businessRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final UserWelcomeEmailService userWelcomeEmailService;
 
     public AuthService(
             UserRepository userRepository,
             BusinessRepository businessRepository,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService
+            JwtService jwtService,
+            UserWelcomeEmailService userWelcomeEmailService
     ) {
         this.userRepository = userRepository;
         this.businessRepository = businessRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.userWelcomeEmailService = userWelcomeEmailService;
     }
 
     @Transactional
@@ -45,6 +51,7 @@ public class AuthService {
         user.updateStatus(UserStatus.ACTIVE);
         User savedUser = userRepository.saveAndFlush(user);
         String accessToken = jwtService.generateAccessToken(savedUser);
+        sendWelcomeEmailAfterCommit(savedUser);
 
         return AuthResponse.bearer(
                 UserResponse.from(savedUser),
@@ -92,6 +99,19 @@ public class AuthService {
             return UserRole.valueOf(role);
         }
         throw new ApiException(HttpStatus.BAD_REQUEST, "Role is not allowed for public registration");
+    }
+
+    private void sendWelcomeEmailAfterCommit(User savedUser) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            userWelcomeEmailService.sendWelcomeEmail(savedUser);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                userWelcomeEmailService.sendWelcomeEmail(savedUser);
+            }
+        });
     }
 
     private ApiException invalidCredentials() {

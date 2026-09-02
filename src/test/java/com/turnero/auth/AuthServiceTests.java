@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.turnero.business.BusinessRepository;
 import com.turnero.common.ApiException;
+import com.turnero.email.UserWelcomeEmailService;
 import com.turnero.user.User;
 import com.turnero.user.UserRepository;
 import com.turnero.user.UserRole;
@@ -23,7 +24,14 @@ class AuthServiceTests {
     private final BusinessRepository businessRepository = org.mockito.Mockito.mock(BusinessRepository.class);
     private final PasswordEncoder passwordEncoder = org.mockito.Mockito.mock(PasswordEncoder.class);
     private final JwtService jwtService = org.mockito.Mockito.mock(JwtService.class);
-    private final AuthService authService = new AuthService(userRepository, businessRepository, passwordEncoder, jwtService);
+    private final UserWelcomeEmailService userWelcomeEmailService = org.mockito.Mockito.mock(UserWelcomeEmailService.class);
+    private final AuthService authService = new AuthService(
+            userRepository,
+            businessRepository,
+            passwordEncoder,
+            jwtService,
+            userWelcomeEmailService
+    );
 
     @Test
     void registerUsesCustomerRoleByDefaultAndHashesPassword() {
@@ -38,6 +46,7 @@ class AuthServiceTests {
 
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).saveAndFlush(captor.capture());
+        verify(userWelcomeEmailService).sendWelcomeEmail(captor.getValue());
         assertThat(captor.getValue().getEmail()).isEqualTo("user@example.com");
         assertThat(captor.getValue().getPasswordHash()).isEqualTo("bcrypt-hash");
         assertThat(captor.getValue().getRoles()).containsExactly(UserRole.CUSTOMER);

@@ -64,6 +64,12 @@ jwt:
 business:
   initial-status: ${BUSINESS_INITIAL_STATUS:ACTIVE}
 
+brevo:
+  api-key: ${BREVO_API_KEY:}
+  from-email: ${BREVO_FROM_EMAIL:}
+  from-name: ${BREVO_FROM_NAME:HallarTurno}
+  base-url: ${BREVO_BASE_URL:https://api.brevo.com}
+
 availability:
   default-zone-id: ${AVAILABILITY_DEFAULT_ZONE_ID:America/Argentina/Buenos_Aires}
   slot-granularity-minutes: ${AVAILABILITY_SLOT_GRANULARITY_MINUTES:15}
