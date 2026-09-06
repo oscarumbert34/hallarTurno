@@ -1,5 +1,6 @@
 package com.turnero.booking;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -31,6 +32,15 @@ public record BookingRequest(
         @NotBlank
         @Size(max = 40)
         @Pattern(regexp = "^[0-9+()\\-\\s]{6,40}$", message = "must be a valid phone number")
-        String customerPhone
+        String customerPhone,
+
+        @Email
+        @Size(max = 320)
+        String customerEmail,
+
+        Boolean skipCustomerContact
 ) {
+    public boolean shouldSkipCustomerContact() {
+        return Boolean.TRUE.equals(skipCustomerContact);
+    }
 }

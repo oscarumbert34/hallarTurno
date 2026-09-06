@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.turnero.customer.CustomerContactRepository;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -47,6 +48,9 @@ class BookingControllerIntegrationTests {
     @Autowired
     private BookingRepository bookingRepository;
 
+    @Autowired
+    private CustomerContactRepository customerContactRepository;
+
     @DynamicPropertySource
     static void configureDatasource(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -68,6 +72,27 @@ class BookingControllerIntegrationTests {
                 .andExpect(jsonPath("$.customerPhone").value("+54 11 5555-1234"))
                 .andExpect(jsonPath("$.serviceName").value("Servicio " + fixture.prefix()));
     }
+
+    @Test
+    void publicBookingCanSkipReusableCustomerContact() throws Exception {
+        Fixture fixture = fixture("booking-skip-contact");
+
+        mockMvc.perform(post("/api/v1/public/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson(fixture, "09:00", true)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.customerContactId").doesNotExist())
+                .andExpect(jsonPath("$.customerEmail").doesNotExist())
+                .andExpect(jsonPath("$.customerName").value("Cliente " + fixture.prefix()))
+                .andExpect(jsonPath("$.customerPhone").value("+54 11 5555-1234"));
+
+        assertThat(customerContactRepository.findByBusinessIdAndNormalizedPhone(
+                UUID.fromString(fixture.businessId()),
+                "541155551234"
+        )).isEmpty();
+    }
+
     @Test
     void customerCreatesAndCancelsOwnBookingWithoutDeletingIt() throws Exception {
         Fixture fixture = fixture("booking-own");
@@ -698,6 +723,28 @@ class BookingControllerIntegrationTests {
 
     private String bookingJson(Fixture fixture, String startsAt) {
         return bookingJson(fixture, "2026-09-07", startsAt);
+    }
+
+    private String bookingJson(Fixture fixture, String startsAt, boolean skipCustomerContact) {
+        return """
+                {
+                  "branchId": "%s",
+                  "serviceOfferingId": "%s",
+                  "resourceId": "%s",
+                  "date": "2026-09-07",
+                  "startsAt": "%s",
+                  "customerName": "Cliente %s",
+                  "customerPhone": "+54 11 5555-1234",
+                  "skipCustomerContact": %s
+                }
+                """.formatted(
+                fixture.branchId(),
+                fixture.serviceOfferingId(),
+                fixture.resourceId(),
+                startsAt,
+                fixture.prefix(),
+                skipCustomerContact
+        );
     }
 
     private String bookingJson(Fixture fixture, String date, String startsAt) {

@@ -10,6 +10,8 @@ import com.turnero.business.BusinessConfiguration;
 import com.turnero.business.BusinessConfigurationRepository;
 import com.turnero.business.BusinessRepository;
 import com.turnero.common.ApiException;
+import com.turnero.customer.CustomerContact;
+import com.turnero.customer.CustomerContactService;
 import com.turnero.employee.BookableResource;
 import com.turnero.employee.BookableResourceRepository;
 import com.turnero.security.OwnershipGuard;
@@ -30,6 +32,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -40,6 +43,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class BookingService {
@@ -62,6 +67,8 @@ public class BookingService {
     private final BookableResourceRepository resourceRepository;
     private final AvailabilityService availabilityService;
     private final OwnershipGuard ownershipGuard;
+    private final CustomerContactService customerContactService;
+    private final BookingConfirmationEmailService bookingConfirmationEmailService;
     private final Clock clock;
     private final MeterRegistry meterRegistry;
 
@@ -75,6 +82,8 @@ public class BookingService {
             BookableResourceRepository resourceRepository,
             AvailabilityService availabilityService,
             OwnershipGuard ownershipGuard,
+            CustomerContactService customerContactService,
+            BookingConfirmationEmailService bookingConfirmationEmailService,
             Clock clock,
             MeterRegistry meterRegistry
     ) {
@@ -87,6 +96,8 @@ public class BookingService {
         this.resourceRepository = resourceRepository;
         this.availabilityService = availabilityService;
         this.ownershipGuard = ownershipGuard;
+        this.customerContactService = customerContactService;
+        this.bookingConfirmationEmailService = bookingConfirmationEmailService;
         this.clock = clock;
         this.meterRegistry = meterRegistry;
     }
@@ -120,6 +131,15 @@ public class BookingService {
                 .plus(Duration.ofMinutes(serviceOffering.getDurationMinutes()))
                 .atZone(zoneId)
                 .toInstant();
+        CustomerContact customerContact = request.shouldSkipCustomerContact()
+                ? null
+                : customerContactService.findOrCreateForBooking(
+                        branch.getBusiness(),
+                        request.customerName(),
+                        request.customerPhone(),
+                        request.customerEmail()
+                );
+        String customerEmailSnapshot = resolveCustomerEmailSnapshot(request, customerContact);
 
         Booking booking = Booking.create(
                 branch,
@@ -133,13 +153,16 @@ public class BookingService {
                 resource.getVisibleName(),
                 request.customerName().trim(),
                 request.customerPhone().trim(),
+                customerEmailSnapshot,
+                customerContact,
                 serviceOffering.getDurationMinutes(),
                 serviceOffering.getPrice(),
                 serviceOffering.getCurrency(),
                 BookingStatus.CONFIRMED
         );
         try {
-            BookingResponse response = BookingResponse.from(bookingRepository.saveAndFlush(booking));
+            Booking savedBooking = bookingRepository.saveAndFlush(booking);
+            BookingResponse response = BookingResponse.from(savedBooking);
             meterRegistry.counter("turnero.bookings.created", "channel", customer == null ? "public" : "authenticated").increment();
             log.info(
                     "booking created id={} businessId={} branchId={} serviceOfferingId={} resourceId={} startsAt={}",
@@ -150,6 +173,7 @@ public class BookingService {
                     response.resourceId(),
                     response.startsAt()
             );
+            sendConfirmationEmailAfterCommit(savedBooking);
             return response;
         } catch (DataIntegrityViolationException exception) {
             meterRegistry.counter("turnero.bookings.conflicts").increment();
@@ -164,6 +188,29 @@ public class BookingService {
             );
             throw new ApiException(HttpStatus.CONFLICT, "Booking slot is already taken");
         }
+    }
+
+    private void sendConfirmationEmailAfterCommit(Booking savedBooking) {
+        if (savedBooking.getCustomerEmailSnapshot() == null || savedBooking.getCustomerEmailSnapshot().isBlank()) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            bookingConfirmationEmailService.sendConfirmation(savedBooking);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                bookingConfirmationEmailService.sendConfirmation(savedBooking);
+            }
+        });
+    }
+
+    private String resolveCustomerEmailSnapshot(BookingRequest request, CustomerContact customerContact) {
+        if (request.customerEmail() != null && !request.customerEmail().isBlank()) {
+            return request.customerEmail().trim().toLowerCase(Locale.ROOT);
+        }
+        return customerContact == null ? null : customerContact.getEmail();
     }
 
     @Transactional
@@ -487,6 +534,8 @@ public class BookingService {
                 source.getResourceNameSnapshot(),
                 source.getCustomerNameSnapshot(),
                 source.getCustomerPhoneSnapshot(),
+                source.getCustomerEmailSnapshot(),
+                source.getCustomerContact(),
                 source.getDurationMinutesSnapshot(),
                 source.getPriceSnapshot(),
                 source.getCurrencySnapshot(),

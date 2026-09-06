@@ -1,0 +1,103 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-create-customer-contacts
+      author: turnero
+      comment: Create reusable customer contacts per business and snapshot booking email.
+      changes:
+        - createTable:
+            tableName: customer_contacts
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_customer_contacts
+                    nullable: false
+              - column:
+                  name: business_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(120)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: phone
+                  type: varchar(40)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: normalized_phone
+                  type: varchar(40)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: email
+                  type: varchar(320)
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: customer_contacts
+            indexName: idx_customer_contacts_business_id
+            columns:
+              - column:
+                  name: business_id
+        - addUniqueConstraint:
+            tableName: customer_contacts
+            columnNames: business_id, normalized_phone
+            constraintName: uk_customer_contacts_business_phone
+        - addForeignKeyConstraint:
+            baseTableName: customer_contacts
+            baseColumnNames: business_id
+            constraintName: fk_customer_contacts_business_id
+            referencedTableName: businesses
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: customer_contact_id
+                  type: uuid
+              - column:
+                  name: customer_email_snapshot
+                  type: varchar(320)
+        - createIndex:
+            tableName: bookings
+            indexName: idx_bookings_customer_contact_id
+            columns:
+              - column:
+                  name: customer_contact_id
+        - addForeignKeyConstraint:
+            baseTableName: bookings
+            baseColumnNames: customer_contact_id
+            constraintName: fk_bookings_customer_contact_id
+            referencedTableName: customer_contacts
+            referencedColumnNames: id
+            onDelete: SET NULL
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: bookings
+            constraintName: fk_bookings_customer_contact_id
+        - dropIndex:
+            tableName: bookings
+            indexName: idx_bookings_customer_contact_id
+        - dropColumn:
+            tableName: bookings
+            columnName: customer_email_snapshot
+        - dropColumn:
+            tableName: bookings
+            columnName: customer_contact_id
+        - dropTable:
+            tableName: customer_contacts

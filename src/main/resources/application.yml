@@ -64,6 +64,14 @@ jwt:
 business:
   initial-status: ${BUSINESS_INITIAL_STATUS:ACTIVE}
 
+booking:
+  reminders:
+    enabled: ${BOOKING_REMINDERS_ENABLED:true}
+    cron: "${BOOKING_REMINDERS_CRON:0 0 18,21 * * *}"
+    zone-id: ${BOOKING_REMINDERS_ZONE_ID:America/Argentina/Buenos_Aires}
+    target-days-offset: ${BOOKING_REMINDERS_TARGET_DAYS_OFFSET:1}
+    minimum-hours-before-start: ${BOOKING_REMINDERS_MINIMUM_HOURS_BEFORE_START:12}
+
 brevo:
   api-key: ${BREVO_API_KEY:}
   from-email: ${BREVO_FROM_EMAIL:}

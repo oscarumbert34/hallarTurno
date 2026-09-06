@@ -22,7 +22,9 @@ class UserWelcomeEmailServiceTests {
         BrevoProperties properties = configuredProperties();
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        UserWelcomeEmailService service = new UserWelcomeEmailService(properties, builder);
+        UserWelcomeEmailService service = new UserWelcomeEmailService(
+                new BrevoTransactionalEmailClient(properties, builder)
+        );
 
         server.expect(once(), requestTo("https://api.brevo.test/v3/smtp/email"))
                 .andExpect(method(HttpMethod.POST))
@@ -43,7 +45,9 @@ class UserWelcomeEmailServiceTests {
     void sendWelcomeEmailSkipsBrevoWhenConfigurationIsIncomplete() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        UserWelcomeEmailService service = new UserWelcomeEmailService(new BrevoProperties(), builder);
+        UserWelcomeEmailService service = new UserWelcomeEmailService(
+                new BrevoTransactionalEmailClient(new BrevoProperties(), builder)
+        );
 
         service.sendWelcomeEmail(User.create("customer@example.com", "hash", UserRole.CUSTOMER));
 

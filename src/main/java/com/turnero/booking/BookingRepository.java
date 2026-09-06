@@ -147,4 +147,27 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             Instant startsAt,
             Collection<BookingStatus> statuses
     );
+
+    @EntityGraph(attributePaths = {
+            "business",
+            "branch",
+            "serviceOffering",
+            "resource"
+    })
+    @Query("""
+            select booking
+            from Booking booking
+            where booking.status = :status
+              and booking.startsAt >= :startsAtFrom
+              and booking.startsAt < :startsAtTo
+              and booking.reminderSentAt is null
+              and booking.customerEmailSnapshot is not null
+              and booking.customerEmailSnapshot <> ''
+            order by booking.startsAt asc, booking.id asc
+            """)
+    List<Booking> findReminderCandidates(
+            @Param("status") BookingStatus status,
+            @Param("startsAtFrom") Instant startsAtFrom,
+            @Param("startsAtTo") Instant startsAtTo
+    );
 }

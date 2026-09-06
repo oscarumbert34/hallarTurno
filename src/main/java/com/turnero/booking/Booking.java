@@ -2,6 +2,7 @@ package com.turnero.booking;
 
 import com.turnero.branch.Branch;
 import com.turnero.business.Business;
+import com.turnero.customer.CustomerContact;
 import com.turnero.employee.BookableResource;
 import com.turnero.service.ServiceOffering;
 import com.turnero.user.User;
@@ -75,6 +76,13 @@ public class Booking {
     @Column(name = "customer_phone_snapshot", nullable = false, length = 40)
     private String customerPhoneSnapshot;
 
+    @Column(name = "customer_email_snapshot", length = 320)
+    private String customerEmailSnapshot;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_contact_id")
+    private CustomerContact customerContact;
+
     @Column(name = "duration_minutes_snapshot", nullable = false)
     private Integer durationMinutesSnapshot;
 
@@ -90,6 +98,9 @@ public class Booking {
 
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
+
+    @Column(name = "reminder_sent_at")
+    private Instant reminderSentAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cancelled_by")
@@ -118,6 +129,8 @@ public class Booking {
             String resourceNameSnapshot,
             String customerNameSnapshot,
             String customerPhoneSnapshot,
+            String customerEmailSnapshot,
+            CustomerContact customerContact,
             Integer durationMinutesSnapshot,
             BigDecimal priceSnapshot,
             String currencySnapshot,
@@ -134,6 +147,8 @@ public class Booking {
         this.resourceNameSnapshot = resourceNameSnapshot;
         this.customerNameSnapshot = customerNameSnapshot;
         this.customerPhoneSnapshot = customerPhoneSnapshot;
+        this.customerEmailSnapshot = customerEmailSnapshot;
+        this.customerContact = customerContact;
         this.durationMinutesSnapshot = durationMinutesSnapshot;
         this.priceSnapshot = priceSnapshot;
         this.currencySnapshot = currencySnapshot;
@@ -152,6 +167,8 @@ public class Booking {
             String resourceNameSnapshot,
             String customerNameSnapshot,
             String customerPhoneSnapshot,
+            String customerEmailSnapshot,
+            CustomerContact customerContact,
             Integer durationMinutesSnapshot,
             BigDecimal priceSnapshot,
             String currencySnapshot,
@@ -169,6 +186,8 @@ public class Booking {
                 resourceNameSnapshot,
                 customerNameSnapshot,
                 customerPhoneSnapshot,
+                customerEmailSnapshot,
+                customerContact,
                 durationMinutesSnapshot,
                 priceSnapshot,
                 currencySnapshot,
@@ -231,6 +250,14 @@ public class Booking {
         return customerPhoneSnapshot;
     }
 
+    public String getCustomerEmailSnapshot() {
+        return customerEmailSnapshot;
+    }
+
+    public CustomerContact getCustomerContact() {
+        return customerContact;
+    }
+
     public Integer getDurationMinutesSnapshot() {
         return durationMinutesSnapshot;
     }
@@ -249,6 +276,10 @@ public class Booking {
 
     public Instant getCancelledAt() {
         return cancelledAt;
+    }
+
+    public Instant getReminderSentAt() {
+        return reminderSentAt;
     }
 
     public User getCancelledBy() {
@@ -270,6 +301,12 @@ public class Booking {
         this.status = BookingStatus.CANCELLED;
         this.cancelledBy = cancelledBy;
         this.cancelledAt = cancelledAt;
+    }
+
+    public void markReminderSent(Instant reminderSentAt) {
+        if (this.reminderSentAt == null) {
+            this.reminderSentAt = reminderSentAt;
+        }
     }
 }
 

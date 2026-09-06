@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 014-add-booking-reminder-sent-at
+      author: turnero
+      comment: Track sent booking reminders to avoid duplicate notifications.
+      changes:
+        - addColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: reminder_sent_at
+                  type: timestamp with time zone
+        - createIndex:
+            tableName: bookings
+            indexName: idx_bookings_reminder_sent_at
+            columns:
+              - column:
+                  name: reminder_sent_at

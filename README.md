@@ -204,6 +204,10 @@ Endpoints publicos:
 - `GET /api/v1/public/availability`
 - `GET /api/v1/public/availability/{serviceOfferingId}/slots`
 - `POST /api/v1/public/bookings`
+
+Endpoint de testing disponible fuera del perfil `prod`:
+
+- `POST /api/v1/testing/booking-reminders/run`: requiere usuario `BUSINESS` o `ADMIN` y dispara manualmente el envio de recordatorios pendientes.
 - `GET /actuator/health`
 - `GET /actuator/health/readiness`
 - `GET /actuator/health/liveness`
@@ -411,8 +415,15 @@ Endpoints protegidos de reservas:
 - `POST /api/v1/bookings/{id}/cancel`
 - `POST /api/v1/businesses/{businessId}/bookings/copy-week`
 - `GET /api/v1/businesses/{businessId}/bookings`
+- `GET /api/v1/businesses/{businessId}/customer-contacts/search?phone={phone}`
 
-Las reservas requieren `customerName` y `customerPhone`, se crean como `CONFIRMED`, guardan snapshot de contacto, servicio, recurso, duracion, precio y moneda, y no se borran fisicamente. La cancelacion minima permite cancelar al cliente de la reserva, al owner del negocio o a `ADMIN`. El listado por negocio es paginado (`page`, `size`; maximo `50`), admite filtros opcionales `date`, `dateFrom`, `dateTo`, `branchId`, `resourceId` y `serviceOfferingId`, y solo lo puede consultar el owner del negocio o `ADMIN`. Devuelve contrato estable con `page`, `size`, `maxSize`, `totalElements`, `totalPages`, `hasMore`, `sort` y `results`; el orden es cronologico ascendente por `startsAt` y luego `id` (`startsAt:asc,id:asc`). Si se informa `date`, el filtro aplica sobre la fecha local del turno en la zona horaria de la sucursal. Para rangos, `dateFrom` y `dateTo` deben enviarse juntos y son inclusivos. Para evitar doble booking se revalida disponibilidad dentro de la transaccion y PostgreSQL aplica una constraint de exclusion por recurso y rango horario para reservas activas; cuando el slot ya fue tomado, la API responde `409 Conflict`.
+Las reservas requieren `customerName` y `customerPhone`; `customerEmail` es opcional. Al crear una reserva, el backend busca o crea un contacto de cliente para ese negocio usando el telefono normalizado como identificador unico, y guarda snapshot de contacto, servicio, recurso, duracion, precio y moneda. La cancelacion minima permite cancelar al cliente de la reserva, al owner del negocio o a `ADMIN`. El listado por negocio es paginado (`page`, `size`; maximo `50`), admite filtros opcionales `date`, `dateFrom`, `dateTo`, `branchId`, `resourceId` y `serviceOfferingId`, y solo lo puede consultar el owner del negocio o `ADMIN`. Devuelve contrato estable con `page`, `size`, `maxSize`, `totalElements`, `totalPages`, `hasMore`, `sort` y `results`; el orden es cronologico ascendente por `startsAt` y luego `id` (`startsAt:asc,id:asc`). Si se informa `date`, el filtro aplica sobre la fecha local del turno en la zona horaria de la sucursal. Para rangos, `dateFrom` y `dateTo` deben enviarse juntos y son inclusivos. Para evitar doble booking se revalida disponibilidad dentro de la transaccion y PostgreSQL aplica una constraint de exclusion por recurso y rango horario para reservas activas; cuando el slot ya fue tomado, la API responde `409 Conflict`.
+
+La busqueda de contacto por telefono es protegida y solo la puede usar el owner del negocio o `ADMIN`. Si existe, responde el contacto; si no, devuelve `404 Customer contact not found`. El frontend puede usar ese `404` para pedir email al cliente final antes de crear el turno.
+
+```text
+GET /api/v1/businesses/{businessId}/customer-contacts/search?phone=%2B54%2011%205555-1234
+```
 
 Ejemplo de listado filtrado por fecha, sucursal, recurso y servicio:
 
@@ -454,7 +465,8 @@ Ejemplo de creacion de reserva:
   "date": "2026-08-26",
   "startsAt": "12:00",
   "customerName": "Juan Perez",
-  "customerPhone": "+54 11 5555-1234"
+  "customerPhone": "+54 11 5555-1234",
+  "customerEmail": "juan@example.com"
 }
 ```
 
