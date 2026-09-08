@@ -133,12 +133,7 @@ public class BookingService {
                 .toInstant();
         CustomerContact customerContact = request.shouldSkipCustomerContact()
                 ? null
-                : customerContactService.findOrCreateForBooking(
-                        branch.getBusiness(),
-                        request.customerName(),
-                        request.customerPhone(),
-                        request.customerEmail()
-                );
+                : this.resolveCustomerContact(request, branch, customer);
         String customerEmailSnapshot = resolveCustomerEmailSnapshot(request, customerContact);
 
         Booking booking = Booking.create(
@@ -204,6 +199,26 @@ public class BookingService {
                 bookingConfirmationEmailService.sendConfirmation(savedBooking);
             }
         });
+    }
+
+    private CustomerContact resolveCustomerContact(
+            BookingRequest request,
+            Branch branch,
+            User customer
+    ) {
+        if (customer == null) {
+            customerContactService.requireEmailForPublicBooking(
+                    branch.getBusiness(),
+                    request.customerPhone(),
+                    request.customerEmail()
+            );
+        }
+        return customerContactService.findOrCreateForBooking(
+                branch.getBusiness(),
+                request.customerName(),
+                request.customerPhone(),
+                request.customerEmail()
+        );
     }
 
     private String resolveCustomerEmailSnapshot(BookingRequest request, CustomerContact customerContact) {

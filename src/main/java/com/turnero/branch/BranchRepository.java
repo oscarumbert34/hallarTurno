@@ -16,6 +16,8 @@ public interface BranchRepository extends JpaRepository<Branch, UUID> {
     @EntityGraph(attributePaths = {"business", "business.owner", "openingIntervals"})
     List<Branch> findDistinctByBusinessIdOrderByNameAsc(UUID businessId);
 
+    List<Branch> findByBusinessIdAndStatusOrderByNameAsc(UUID businessId, BranchStatus status);
+
     @EntityGraph(attributePaths = {"business", "openingIntervals"})
     @Query("""
             select distinct branch

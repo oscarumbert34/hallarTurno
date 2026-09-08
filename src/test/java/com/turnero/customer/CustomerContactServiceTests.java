@@ -6,12 +6,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.turnero.auth.AuthenticatedUser;
 import com.turnero.business.Business;
 import com.turnero.business.BusinessRepository;
 import com.turnero.business.BusinessStatus;
 import com.turnero.common.ApiException;
-import com.turnero.security.OwnershipGuard;
 import com.turnero.user.User;
 import com.turnero.user.UserRole;
 import java.util.Optional;
@@ -24,40 +22,43 @@ class CustomerContactServiceTests {
 
     private final CustomerContactRepository customerContactRepository = org.mockito.Mockito.mock(CustomerContactRepository.class);
     private final BusinessRepository businessRepository = org.mockito.Mockito.mock(BusinessRepository.class);
-    private final OwnershipGuard ownershipGuard = new OwnershipGuard();
     private final CustomerContactService service = new CustomerContactService(
             customerContactRepository,
-            businessRepository,
-            ownershipGuard
+            businessRepository
     );
 
     @Test
-    void findByPhoneNormalizesPhoneAndRequiresBusinessOwner() {
+    void findEmailStatusNormalizesPhoneAndDoesNotExposeContactData() {
         User owner = user("owner@example.com", UserRole.BUSINESS);
         Business business = business(owner);
         CustomerContact contact = contact(business, "Ana Cliente", "+54 11 5555-1234", "ana@example.com");
-        AuthenticatedUser currentUser = new AuthenticatedUser(owner.getId(), owner.getEmail(), owner.getRoles());
         when(businessRepository.findById(business.getId())).thenReturn(Optional.of(business));
         when(customerContactRepository.findByBusinessIdAndNormalizedPhone(business.getId(), "541155551234"))
                 .thenReturn(Optional.of(contact));
 
-        CustomerContactResponse response = service.findByPhone(business.getId(), "+54 (11) 5555-1234", currentUser);
+        CustomerEmailStatusResponse response = service.findEmailStatus(
+                business.getId(),
+                "+54 (11) 5555-1234"
+        );
 
-        assertThat(response.email()).isEqualTo("ana@example.com");
+        assertThat(response.emailRequired()).isFalse();
         verify(customerContactRepository).findByBusinessIdAndNormalizedPhone(business.getId(), "541155551234");
     }
 
     @Test
-    void findByPhoneRejectsOtherBusinessUsers() {
+    void findEmailStatusRequiresEmailWhenContactDoesNotExist() {
         User owner = user("owner@example.com", UserRole.BUSINESS);
-        User other = user("other@example.com", UserRole.BUSINESS);
         Business business = business(owner);
-        AuthenticatedUser currentUser = new AuthenticatedUser(other.getId(), other.getEmail(), other.getRoles());
         when(businessRepository.findById(business.getId())).thenReturn(Optional.of(business));
+        when(customerContactRepository.findByBusinessIdAndNormalizedPhone(business.getId(), "541155551234"))
+                .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.findByPhone(business.getId(), "+54 11 5555-1234", currentUser))
-                .isInstanceOf(ApiException.class)
-                .hasMessage("Customer contacts can only be viewed by the business owner or an admin");
+        CustomerEmailStatusResponse response = service.findEmailStatus(
+                business.getId(),
+                "+54 11 5555-1234"
+        );
+
+        assertThat(response.emailRequired()).isTrue();
     }
 
     @Test
@@ -82,6 +83,21 @@ class CustomerContactServiceTests {
         assertThat(contact.getPhone()).isEqualTo("+54 (11) 5555-1234");
         assertThat(contact.getNormalizedPhone()).isEqualTo("541155551234");
         assertThat(contact.getEmail()).isEqualTo("ana@example.com");
+    }
+
+    @Test
+    void findOrCreateForBookingRequiresEmailOnlyWhenItWasNeverRegistered() {
+        User owner = user("owner@example.com", UserRole.BUSINESS);
+        Business business = business(owner);
+        when(customerContactRepository.findByBusinessIdAndNormalizedPhone(business.getId(), "541155551234"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.requireEmailForPublicBooking(
+                business,
+                "+54 11 5555-1234",
+                null
+        )).isInstanceOf(ApiException.class)
+                .hasMessage("Customer email is required for the first booking");
     }
 
     @Test

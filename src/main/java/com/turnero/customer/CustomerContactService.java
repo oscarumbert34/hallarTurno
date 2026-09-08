@@ -1,10 +1,10 @@
 package com.turnero.customer;
 
-import com.turnero.auth.AuthenticatedUser;
 import com.turnero.business.Business;
 import com.turnero.business.BusinessRepository;
+import com.turnero.business.BusinessStatus;
 import com.turnero.common.ApiException;
-import com.turnero.security.OwnershipGuard;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -16,38 +16,57 @@ public class CustomerContactService {
 
     private final CustomerContactRepository customerContactRepository;
     private final BusinessRepository businessRepository;
-    private final OwnershipGuard ownershipGuard;
 
     public CustomerContactService(
             CustomerContactRepository customerContactRepository,
-            BusinessRepository businessRepository,
-            OwnershipGuard ownershipGuard
+            BusinessRepository businessRepository
     ) {
         this.customerContactRepository = customerContactRepository;
         this.businessRepository = businessRepository;
-        this.ownershipGuard = ownershipGuard;
     }
 
     @Transactional(readOnly = true)
-    public CustomerContactResponse findByPhone(UUID businessId, String phone, AuthenticatedUser currentUser) {
+    public CustomerEmailStatusResponse findEmailStatus(UUID businessId, String phone) {
         Business business = businessRepository.findById(businessId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Business not found"));
-        ownershipGuard.requireOwnerOrAdmin(business, currentUser, "Customer contacts can only be viewed by the business owner or an admin");
+        if (business.getStatus() != BusinessStatus.ACTIVE) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "Business not found");
+        }
         String normalizedPhone = normalizeRequiredPhone(phone);
-        return customerContactRepository.findByBusinessIdAndNormalizedPhone(businessId, normalizedPhone)
-                .map(CustomerContactResponse::from)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Customer contact not found"));
+        boolean emailRequired = customerContactRepository
+                .findByBusinessIdAndNormalizedPhone(businessId, normalizedPhone)
+                .map(contact -> contact.getEmail() == null || contact.getEmail().isBlank())
+                .orElse(true);
+        return new CustomerEmailStatusResponse(emailRequired);
     }
 
     @Transactional
     public CustomerContact findOrCreateForBooking(Business business, String customerName, String customerPhone, String customerEmail) {
         String normalizedPhone = normalizeRequiredPhone(customerPhone);
-        return customerContactRepository.findByBusinessIdAndNormalizedPhone(business.getId(), normalizedPhone)
+        Optional<CustomerContact> existingContact = customerContactRepository
+                .findByBusinessIdAndNormalizedPhone(business.getId(), normalizedPhone);
+        return existingContact
                 .map(existing -> {
                     existing.updateFromBooking(customerName, customerPhone, customerEmail);
                     return existing;
                 })
                 .orElseGet(() -> createContact(business, customerName, customerPhone, customerEmail, normalizedPhone));
+    }
+
+    @Transactional(readOnly = true)
+    public void requireEmailForPublicBooking(Business business, String phone, String email) {
+        if (email != null && !email.isBlank()) {
+            return;
+        }
+        String normalizedPhone = normalizeRequiredPhone(phone);
+        boolean hasStoredEmail = customerContactRepository
+                .findByBusinessIdAndNormalizedPhone(business.getId(), normalizedPhone)
+                .map(CustomerContact::getEmail)
+                .filter(storedEmail -> !storedEmail.isBlank())
+                .isPresent();
+        if (!hasStoredEmail) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Customer email is required for the first booking");
+        }
     }
 
     private CustomerContact createContact(

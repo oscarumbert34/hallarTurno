@@ -64,13 +64,25 @@ class BookingControllerIntegrationTests {
 
         mockMvc.perform(post("/api/v1/public/bookings")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(bookingJson(fixture, "09:00")))
+                        .content(publicBookingJsonWithEmail(fixture, "09:00")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"))
                 .andExpect(jsonPath("$.customerId").doesNotExist())
                 .andExpect(jsonPath("$.customerName").value("Cliente " + fixture.prefix()))
                 .andExpect(jsonPath("$.customerPhone").value("+54 11 5555-1234"))
+                .andExpect(jsonPath("$.customerEmail").value("cliente@example.com"))
                 .andExpect(jsonPath("$.serviceName").value("Servicio " + fixture.prefix()));
+    }
+
+    @Test
+    void firstPublicBookingRequiresCustomerEmail() throws Exception {
+        Fixture fixture = fixture("booking-public-email-required");
+
+        mockMvc.perform(post("/api/v1/public/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJson(fixture, "09:00")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Customer email is required for the first booking"));
     }
 
     @Test
@@ -723,6 +735,27 @@ class BookingControllerIntegrationTests {
 
     private String bookingJson(Fixture fixture, String startsAt) {
         return bookingJson(fixture, "2026-09-07", startsAt);
+    }
+
+    private String publicBookingJsonWithEmail(Fixture fixture, String startsAt) {
+        return """
+                {
+                  "branchId": "%s",
+                  "serviceOfferingId": "%s",
+                  "resourceId": "%s",
+                  "date": "2026-09-07",
+                  "startsAt": "%s",
+                  "customerName": "Cliente %s",
+                  "customerPhone": "+54 11 5555-1234",
+                  "customerEmail": "cliente@example.com"
+                }
+                """.formatted(
+                fixture.branchId(),
+                fixture.serviceOfferingId(),
+                fixture.resourceId(),
+                startsAt,
+                fixture.prefix()
+        );
     }
 
     private String bookingJson(Fixture fixture, String startsAt, boolean skipCustomerContact) {

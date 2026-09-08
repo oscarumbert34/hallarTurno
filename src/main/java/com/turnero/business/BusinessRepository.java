@@ -1,6 +1,7 @@
 package com.turnero.business;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,6 +13,8 @@ import org.springframework.data.repository.query.Param;
 public interface BusinessRepository extends JpaRepository<Business, UUID> {
 
     boolean existsBySlug(String slug);
+
+    Optional<Business> findBySlugAndStatus(String slug, BusinessStatus status);
 
     @EntityGraph(attributePaths = "owner")
     List<Business> findByOwnerIdOrderByCreatedAtDesc(UUID ownerId);

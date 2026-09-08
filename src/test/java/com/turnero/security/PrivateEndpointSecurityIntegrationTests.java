@@ -180,17 +180,18 @@ class PrivateEndpointSecurityIntegrationTests {
     }
 
     @Test
-    void businessOwnerCanSearchCustomerContactByPhone() throws Exception {
+    void customerEmailStatusIsPublicAndDoesNotExposeContactData() throws Exception {
         Tenant tenant = tenant("cc-search");
         String customerToken = registerAndGetToken(uniqueEmail("contact-customer"), "CUSTOMER");
         createBooking(customerToken, tenant, "09:00");
 
         mockMvc.perform(get("/api/v1/businesses/" + tenant.businessId() + "/customer-contacts/search")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tenant.ownerToken())
                         .param("phone", "+54 11 5555-4321"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Cliente seguridad"))
-                .andExpect(jsonPath("$.phone").value("+54 11 5555-4321"));
+                .andExpect(jsonPath("$.emailRequired").value(true))
+                .andExpect(jsonPath("$.name").doesNotExist())
+                .andExpect(jsonPath("$.phone").doesNotExist())
+                .andExpect(jsonPath("$.email").doesNotExist());
     }
 
     @Test

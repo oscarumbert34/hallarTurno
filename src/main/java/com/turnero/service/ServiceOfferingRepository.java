@@ -28,6 +28,21 @@ public interface ServiceOfferingRepository extends JpaRepository<ServiceOffering
     @Query("""
             select offering
             from ServiceOffering offering
+            where offering.business.id = :businessId
+              and offering.status = :status
+              and (offering.branch is null or offering.branch.id = :branchId)
+            order by offering.name asc
+            """)
+    List<ServiceOffering> findPublicActiveForBranch(
+            @Param("businessId") UUID businessId,
+            @Param("branchId") UUID branchId,
+            @Param("status") ServiceOfferingStatus status
+    );
+
+    @EntityGraph(attributePaths = {"business", "branch"})
+    @Query("""
+            select offering
+            from ServiceOffering offering
             join offering.business business
             left join offering.branch branch
             where offering.status = :offeringStatus

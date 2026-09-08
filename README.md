@@ -203,6 +203,8 @@ Endpoints publicos:
 - `GET /api/v1/businesses/{businessId}/service-offerings`
 - `GET /api/v1/public/availability`
 - `GET /api/v1/public/availability/{serviceOfferingId}/slots`
+- `GET /api/v1/public/businesses/{slug}`
+- `GET /api/v1/public/businesses/{slug}/branches/{branchId}/services`
 - `POST /api/v1/public/bookings`
 
 Endpoint de testing disponible fuera del perfil `prod`:
@@ -415,7 +417,7 @@ Endpoints protegidos de reservas:
 - `POST /api/v1/bookings/{id}/cancel`
 - `POST /api/v1/businesses/{businessId}/bookings/copy-week`
 - `GET /api/v1/businesses/{businessId}/bookings`
-- `GET /api/v1/businesses/{businessId}/customer-contacts/search?phone={phone}`
+- `GET /api/v1/businesses/{businessId}/customer-contacts/search?phone={phone}` (publico; devuelve `emailRequired`)
 
 Las reservas requieren `customerName` y `customerPhone`; `customerEmail` es opcional. Al crear una reserva, el backend busca o crea un contacto de cliente para ese negocio usando el telefono normalizado como identificador unico, y guarda snapshot de contacto, servicio, recurso, duracion, precio y moneda. La cancelacion minima permite cancelar al cliente de la reserva, al owner del negocio o a `ADMIN`. El listado por negocio es paginado (`page`, `size`; maximo `50`), admite filtros opcionales `date`, `dateFrom`, `dateTo`, `branchId`, `resourceId` y `serviceOfferingId`, y solo lo puede consultar el owner del negocio o `ADMIN`. Devuelve contrato estable con `page`, `size`, `maxSize`, `totalElements`, `totalPages`, `hasMore`, `sort` y `results`; el orden es cronologico ascendente por `startsAt` y luego `id` (`startsAt:asc,id:asc`). Si se informa `date`, el filtro aplica sobre la fecha local del turno en la zona horaria de la sucursal. Para rangos, `dateFrom` y `dateTo` deben enviarse juntos y son inclusivos. Para evitar doble booking se revalida disponibilidad dentro de la transaccion y PostgreSQL aplica una constraint de exclusion por recurso y rango horario para reservas activas; cuando el slot ya fue tomado, la API responde `409 Conflict`.
 

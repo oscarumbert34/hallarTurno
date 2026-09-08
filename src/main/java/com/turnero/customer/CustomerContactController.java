@@ -1,9 +1,7 @@
 package com.turnero.customer;
 
-import com.turnero.auth.AuthenticatedUser;
 import jakarta.validation.constraints.NotBlank;
 import java.util.UUID;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,12 +21,10 @@ public class CustomerContactController {
     }
 
     @GetMapping("/businesses/{businessId}/customer-contacts/search")
-    CustomerContactResponse findByPhone(
+    CustomerEmailStatusResponse findByPhone(
             @PathVariable UUID businessId,
-            @RequestParam @NotBlank String phone,
-            @AuthenticationPrincipal
-            AuthenticatedUser currentUser
+            @RequestParam @NotBlank String phone
     ) {
-        return customerContactService.findByPhone(businessId, phone, currentUser);
+        return customerContactService.findEmailStatus(businessId, phone);
     }
 }
