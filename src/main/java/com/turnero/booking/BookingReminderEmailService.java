@@ -82,7 +82,7 @@ public class BookingReminderEmailService {
                           </tr>
                           <tr>
                             <td style="padding:40px 36px;">
-                              <h1 style="margin:0 0 20px; font-size:24px; line-height:1.3; color:#111827;">Tu turno es hoy</h1>
+                              <h1 style="margin:0 0 20px; font-size:24px; line-height:1.3; color:#111827;">Tu turno es mañana</h1>
                               <p style="margin:0 0 18px; font-size:16px; line-height:1.6; color:#4b5563;">Hola %s,</p>
                               <p style="margin:0 0 24px; font-size:16px; line-height:1.6; color:#4b5563;">Te recordamos que tenés un turno reservado.</p>
                               <table width="100%%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb; border-radius:10px;">

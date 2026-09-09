@@ -39,6 +39,7 @@ class BookingReminderEmailServiceTests {
                 .andExpect(content().string(containsString("\"email\":\"ana@example.com\"")))
                 .andExpect(content().string(containsString("\"subject\":\"Recordatorio de tu turno en HallarTurno\"")))
                 .andExpect(content().string(containsString("Te recordamos tu turno para 08/09/2026 a las 10:00.")))
+                .andExpect(content().string(containsString("Tu turno es mañana")))
                 .andRespond(withSuccess());
 
         org.assertj.core.api.Assertions.assertThat(service.sendReminder(booking("ana@example.com"))).isTrue();
