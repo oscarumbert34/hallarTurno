@@ -40,6 +40,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(EndpointRequest.to(HealthEndpoint.class, InfoEndpoint.class, MetricsEndpoint.class)).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/public/bookings").permitAll()
+                        .requestMatchers("/api/v1/public/appointments/actions/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/businesses").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/businesses/*/branches").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/businesses/*/service-offerings").permitAll()

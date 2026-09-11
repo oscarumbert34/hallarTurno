@@ -138,7 +138,8 @@ class BusinessControllerIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.businessId").value(businessId))
                 .andExpect(jsonPath("$.weeklyBookingCopyEnabled").value(false))
-                .andExpect(jsonPath("$.depositEnabled").value(false));
+                .andExpect(jsonPath("$.depositEnabled").value(false))
+                .andExpect(jsonPath("$.appointmentConfirmationEnabled").value(false));
 
         mockMvc.perform(put("/api/v1/businesses/" + businessId + "/configuration")
                         .header("Authorization", "Bearer " + token)
@@ -146,13 +147,15 @@ class BusinessControllerIntegrationTests {
                         .content("""
                                 {
                                   "weeklyBookingCopyEnabled": true,
-                                  "depositEnabled": true
+                                  "depositEnabled": true,
+                                  "appointmentConfirmationEnabled": true
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.businessId").value(businessId))
                 .andExpect(jsonPath("$.weeklyBookingCopyEnabled").value(true))
-                .andExpect(jsonPath("$.depositEnabled").value(true));
+                .andExpect(jsonPath("$.depositEnabled").value(true))
+                .andExpect(jsonPath("$.appointmentConfirmationEnabled").value(true));
 
         mockMvc.perform(get("/api/v1/businesses/" + businessId)
                         .header("Authorization", "Bearer " + token))

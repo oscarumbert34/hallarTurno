@@ -343,6 +343,13 @@ public class Booking {
         this.cancelledAt = cancelledAt;
     }
 
+    public void confirm() {
+        if (status != BookingStatus.PENDING_CONFIRMATION) {
+            throw new IllegalStateException("Only a pending confirmation booking can be confirmed");
+        }
+        this.status = BookingStatus.CONFIRMED;
+    }
+
     public void markReminderSent(Instant reminderSentAt) {
         if (this.reminderSentAt == null) {
             this.reminderSentAt = reminderSentAt;

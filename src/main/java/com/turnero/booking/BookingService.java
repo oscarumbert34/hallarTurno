@@ -55,6 +55,7 @@ public class BookingService {
     private static final String SORT_ORDER = "startsAt:asc,id:asc";
     private static final Set<BookingStatus> COPYABLE_BOOKING_STATUSES = Set.of(
             BookingStatus.PENDING,
+            BookingStatus.PENDING_CONFIRMATION,
             BookingStatus.CONFIRMED
     );
 
@@ -69,6 +70,7 @@ public class BookingService {
     private final OwnershipGuard ownershipGuard;
     private final CustomerContactService customerContactService;
     private final BookingConfirmationEmailService bookingConfirmationEmailService;
+    private final BookingActionTokenService bookingActionTokenService;
     private final Clock clock;
     private final MeterRegistry meterRegistry;
 
@@ -84,6 +86,7 @@ public class BookingService {
             OwnershipGuard ownershipGuard,
             CustomerContactService customerContactService,
             BookingConfirmationEmailService bookingConfirmationEmailService,
+            BookingActionTokenService bookingActionTokenService,
             Clock clock,
             MeterRegistry meterRegistry
     ) {
@@ -98,6 +101,7 @@ public class BookingService {
         this.ownershipGuard = ownershipGuard;
         this.customerContactService = customerContactService;
         this.bookingConfirmationEmailService = bookingConfirmationEmailService;
+        this.bookingActionTokenService = bookingActionTokenService;
         this.clock = clock;
         this.meterRegistry = meterRegistry;
     }
@@ -136,6 +140,9 @@ public class BookingService {
                 : this.resolveCustomerContact(request, branch, customer);
         String customerEmailSnapshot = resolveCustomerEmailSnapshot(request, customerContact);
         DepositStatus depositStatus = resolveDepositStatus(branch.getBusiness(), request.depositPaid());
+        boolean confirmationEnabled = isAppointmentConfirmationEnabled(branch.getBusiness());
+        boolean includeActionLink = confirmationEnabled
+                && request.date().equals(LocalDate.now(clock.withZone(zoneId)).plusDays(1));
 
         Booking booking = Booking.create(
                 branch,
@@ -154,7 +161,7 @@ public class BookingService {
                 serviceOffering.getDurationMinutes(),
                 serviceOffering.getPrice(),
                 serviceOffering.getCurrency(),
-                BookingStatus.CONFIRMED,
+                confirmationEnabled ? BookingStatus.PENDING_CONFIRMATION : BookingStatus.CONFIRMED,
                 depositStatus
         );
         try {
@@ -170,7 +177,8 @@ public class BookingService {
                     response.resourceId(),
                     response.startsAt()
             );
-            sendConfirmationEmailAfterCommit(savedBooking);
+            String actionToken = includeActionLink ? bookingActionTokenService.issueFor(savedBooking) : null;
+            sendCreationEmailAfterCommit(savedBooking, actionToken);
             return response;
         } catch (DataIntegrityViolationException exception) {
             meterRegistry.counter("turnero.bookings.conflicts").increment();
@@ -187,18 +195,34 @@ public class BookingService {
         }
     }
 
-    private void sendConfirmationEmailAfterCommit(Booking savedBooking) {
-        if (savedBooking.getCustomerEmailSnapshot() == null || savedBooking.getCustomerEmailSnapshot().isBlank()) {
+    private boolean isAppointmentConfirmationEnabled(Business business) {
+        return businessConfigurationRepository.findById(business.getId())
+                .map(BusinessConfiguration::isAppointmentConfirmationEnabled)
+                .orElse(false);
+    }
+
+    private void sendCreationEmailAfterCommit(Booking booking, String actionToken) {
+        if (booking.getCustomerEmailSnapshot() == null || booking.getCustomerEmailSnapshot().isBlank()) {
             return;
         }
+        Runnable send = () -> {
+            boolean sent = bookingConfirmationEmailService.sendConfirmation(booking, actionToken);
+            if (actionToken != null) {
+                if (sent) {
+                    bookingActionTokenService.markNotificationSent(actionToken);
+                } else {
+                    bookingActionTokenService.discard(actionToken);
+                }
+            }
+        };
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            bookingConfirmationEmailService.sendConfirmation(savedBooking);
+            send.run();
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                bookingConfirmationEmailService.sendConfirmation(savedBooking);
+                send.run();
             }
         });
     }

@@ -1,0 +1,79 @@
+databaseChangeLog:
+  - changeSet:
+      id: 017-add-booking-action-tokens
+      author: turnero
+      comment: Add one-use public confirmation and cancellation tokens for bookings.
+      changes:
+        - sql:
+            sql: ALTER TABLE bookings DROP CONSTRAINT ck_bookings_status
+        - sql:
+            sql: ALTER TABLE bookings ADD CONSTRAINT ck_bookings_status CHECK (status IN ('PENDING', 'PENDING_CONFIRMATION', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'))
+        - sql:
+            sql: ALTER TABLE bookings DROP CONSTRAINT ex_bookings_resource_active_overlap
+        - sql:
+            sql: ALTER TABLE bookings ADD CONSTRAINT ex_bookings_resource_active_overlap EXCLUDE USING gist (resource_id WITH =, tstzrange(starts_at, ends_at, '[)') WITH &&) WHERE (status IN ('PENDING', 'PENDING_CONFIRMATION', 'CONFIRMED'))
+        - createTable:
+            tableName: booking_action_tokens
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: booking_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: token_hash
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: used
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expires_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: used_at
+                  type: timestamp with time zone
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: booking_action_tokens
+            baseColumnNames: booking_id
+            constraintName: fk_booking_action_tokens_booking
+            referencedTableName: bookings
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: booking_action_tokens
+            indexName: idx_booking_action_tokens_hash
+            columns:
+              - column:
+                  name: token_hash
+      rollback:
+        - dropTable:
+            tableName: booking_action_tokens
+        - sql:
+            sql: ALTER TABLE bookings DROP CONSTRAINT ex_bookings_resource_active_overlap
+        - sql:
+            sql: ALTER TABLE bookings ADD CONSTRAINT ex_bookings_resource_active_overlap EXCLUDE USING gist (resource_id WITH =, tstzrange(starts_at, ends_at, '[)') WITH &&) WHERE (status IN ('PENDING', 'CONFIRMED'))
+        - sql:
+            sql: ALTER TABLE bookings DROP CONSTRAINT ck_bookings_status
+        - sql:
+            sql: ALTER TABLE bookings ADD CONSTRAINT ck_bookings_status CHECK (status IN ('PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'))

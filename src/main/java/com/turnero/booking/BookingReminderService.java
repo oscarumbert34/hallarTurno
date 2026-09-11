@@ -1,10 +1,12 @@
 package com.turnero.booking;
 
+import com.turnero.business.BusinessConfigurationRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -18,17 +20,26 @@ public class BookingReminderService {
 
     private final ObjectProvider<BookingRepository> bookingRepositoryProvider;
     private final BookingReminderEmailService emailService;
+    private final BookingConfirmationEmailService confirmationEmailService;
+    private final BookingActionTokenService actionTokenService;
+    private final ObjectProvider<BusinessConfigurationRepository> configurationRepositoryProvider;
     private final BookingReminderProperties properties;
     private final Clock clock;
 
     public BookingReminderService(
             final ObjectProvider<BookingRepository> bookingRepositoryProvider,
             final BookingReminderEmailService emailService,
+            final BookingConfirmationEmailService confirmationEmailService,
+            final BookingActionTokenService actionTokenService,
+            final ObjectProvider<BusinessConfigurationRepository> configurationRepositoryProvider,
             final BookingReminderProperties properties,
             final Clock clock
     ) {
         this.bookingRepositoryProvider = bookingRepositoryProvider;
         this.emailService = emailService;
+        this.confirmationEmailService = confirmationEmailService;
+        this.actionTokenService = actionTokenService;
+        this.configurationRepositoryProvider = configurationRepositoryProvider;
         this.properties = properties;
         this.clock = clock;
     }
@@ -41,8 +52,9 @@ public class BookingReminderService {
         }
 
         final BookingRepository bookingRepository = this.bookingRepositoryProvider.getIfAvailable();
-        if (bookingRepository == null) {
-            log.debug("booking reminders skipped because booking repository is not available");
+        final BusinessConfigurationRepository configurationRepository = this.configurationRepositoryProvider.getIfAvailable();
+        if (bookingRepository == null || configurationRepository == null) {
+            log.debug("booking notifications skipped because a repository is not available");
             return;
         }
 
@@ -65,13 +77,19 @@ public class BookingReminderService {
             return;
         }
         final List<Booking> candidates = bookingRepository.findReminderCandidates(
-                BookingStatus.CONFIRMED,
+                Set.of(BookingStatus.CONFIRMED, BookingStatus.PENDING_CONFIRMATION),
                 startsAtFrom,
                 startsAtTo
         );
         int sent = 0;
         for (Booking booking : candidates) {
-            if (this.emailService.sendReminder(booking)) {
+            final boolean confirmationEnabled = configurationRepository.findById(booking.getBusiness().getId())
+                    .map(configuration -> configuration.isAppointmentConfirmationEnabled())
+                    .orElse(false);
+            final boolean emailSent = confirmationEnabled
+                    ? sendConfirmationIfPending(booking)
+                    : sendReminderIfConfirmed(booking);
+            if (emailSent) {
                 booking.markReminderSent(Instant.now(this.clock));
                 sent++;
             }
@@ -83,5 +101,21 @@ public class BookingReminderService {
                 sent,
                 startsAtFrom
         );
+    }
+
+    private boolean sendConfirmationIfPending(Booking booking) {
+        if (booking.getStatus() != BookingStatus.PENDING_CONFIRMATION) {
+            return false;
+        }
+        final String actionToken = actionTokenService.issueFor(booking);
+        final boolean sent = confirmationEmailService.sendConfirmation(booking, actionToken);
+        if (!sent) {
+            actionTokenService.discard(actionToken);
+        }
+        return sent;
+    }
+
+    private boolean sendReminderIfConfirmed(Booking booking) {
+        return booking.getStatus() == BookingStatus.CONFIRMED && emailService.sendReminder(booking);
     }
 }

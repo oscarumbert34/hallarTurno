@@ -114,6 +114,9 @@ public class BusinessService {
         this.ownershipGuard.requireOwnerOrAdmin(business, currentUser, "Business can only be managed by its owner or an admin");
         final BusinessConfiguration configuration = this.findOrCreateConfiguration(business);
         configuration.updateWeeklyBookingCopyEnabled(request.weeklyBookingCopyEnabled());
+        if (request.appointmentConfirmationEnabled() != null) {
+            configuration.updateAppointmentConfirmationEnabled(request.appointmentConfirmationEnabled());
+        }
         if (request.depositEnabled() != null) {
             business.updateDepositEnabled(request.depositEnabled());
         }

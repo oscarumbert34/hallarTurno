@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 018-add-appointment-confirmation-configuration
+      author: turnero
+      comment: Configure appointment confirmation emails per business.
+      changes:
+        - addColumn:
+            tableName: business_configurations
+            columns:
+              - column:
+                  name: appointment_confirmation_enabled
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: business_configurations
+            columnName: appointment_confirmation_enabled

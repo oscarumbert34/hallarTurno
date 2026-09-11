@@ -29,6 +29,9 @@ public class BusinessConfiguration {
     @Column(name = "weekly_booking_copy_enabled", nullable = false)
     private boolean weeklyBookingCopyEnabled;
 
+    @Column(name = "appointment_confirmation_enabled", nullable = false)
+    private boolean appointmentConfirmationEnabled;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -40,13 +43,14 @@ public class BusinessConfiguration {
     protected BusinessConfiguration() {
     }
 
-    private BusinessConfiguration(Business business, boolean weeklyBookingCopyEnabled) {
+    private BusinessConfiguration(Business business, boolean weeklyBookingCopyEnabled, boolean appointmentConfirmationEnabled) {
         this.business = business;
         this.weeklyBookingCopyEnabled = weeklyBookingCopyEnabled;
+        this.appointmentConfirmationEnabled = appointmentConfirmationEnabled;
     }
 
     public static BusinessConfiguration createDefault(Business business) {
-        return new BusinessConfiguration(business, false);
+        return new BusinessConfiguration(business, false, false);
     }
 
     public UUID getBusinessId() {
@@ -61,6 +65,10 @@ public class BusinessConfiguration {
         return weeklyBookingCopyEnabled;
     }
 
+    public boolean isAppointmentConfirmationEnabled() {
+        return appointmentConfirmationEnabled;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -71,5 +79,9 @@ public class BusinessConfiguration {
 
     public void updateWeeklyBookingCopyEnabled(boolean weeklyBookingCopyEnabled) {
         this.weeklyBookingCopyEnabled = weeklyBookingCopyEnabled;
+    }
+
+    public void updateAppointmentConfirmationEnabled(boolean appointmentConfirmationEnabled) {
+        this.appointmentConfirmationEnabled = appointmentConfirmationEnabled;
     }
 }

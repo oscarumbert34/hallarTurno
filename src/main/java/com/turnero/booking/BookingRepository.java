@@ -157,7 +157,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("""
             select booking
             from Booking booking
-            where booking.status = :status
+            where booking.status in :statuses
               and booking.startsAt >= :startsAtFrom
               and booking.startsAt < :startsAtTo
               and booking.reminderSentAt is null
@@ -166,7 +166,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             order by booking.startsAt asc, booking.id asc
             """)
     List<Booking> findReminderCandidates(
-            @Param("status") BookingStatus status,
+            @Param("statuses") Collection<BookingStatus> statuses,
             @Param("startsAtFrom") Instant startsAtFrom,
             @Param("startsAtTo") Instant startsAtTo
     );

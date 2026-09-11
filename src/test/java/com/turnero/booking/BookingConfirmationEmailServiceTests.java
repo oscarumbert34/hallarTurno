@@ -61,6 +61,27 @@ class BookingConfirmationEmailServiceTests {
     }
 
     @Test
+    void pendingConfirmationEmailLinksToFrontendWithoutExecutingAnAction() {
+        BrevoProperties properties = configuredProperties();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        BookingConfirmationEmailService service = new BookingConfirmationEmailService(
+                new BrevoTransactionalEmailClient(properties, builder)
+        );
+
+        server.expect(once(), requestTo("https://api.brevo.test/v3/smtp/email"))
+                .andExpect(content().string(containsString("Tu turno fue reservado")))
+                .andExpect(content().string(containsString("https://hallarturno.com.ar/turno/test-token")))
+                .andExpect(content().string(containsString("Confirmar turno")))
+                .andExpect(content().string(containsString("Cancelar turno")))
+                .andRespond(withSuccess());
+
+        service.sendConfirmation(booking("ana@example.com"), "test-token");
+
+        server.verify();
+    }
+
+    @Test
     void sendRescheduleUsesUpdatedSchedule() {
         BrevoProperties properties = configuredProperties();
         RestClient.Builder builder = RestClient.builder();

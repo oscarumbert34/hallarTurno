@@ -41,6 +41,7 @@ public class AvailabilityService {
 
     private static final Set<BookingStatus> ACTIVE_BOOKING_STATUSES = Set.of(
             BookingStatus.PENDING,
+            BookingStatus.PENDING_CONFIRMATION,
             BookingStatus.CONFIRMED
     );
 
