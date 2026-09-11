@@ -77,6 +77,7 @@ class BusinessControllerIntegrationTests {
                 .andExpect(jsonPath("$.name").value("Cafe Central"))
                 .andExpect(jsonPath("$.slug").value("cafe-central"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.depositEnabled").value(false))
                 .andExpect(jsonPath("$.owner.passwordHash").doesNotExist())
                 .andReturn()
                 .getResponse()
@@ -136,19 +137,32 @@ class BusinessControllerIntegrationTests {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.businessId").value(businessId))
-                .andExpect(jsonPath("$.weeklyBookingCopyEnabled").value(false));
+                .andExpect(jsonPath("$.weeklyBookingCopyEnabled").value(false))
+                .andExpect(jsonPath("$.depositEnabled").value(false));
 
         mockMvc.perform(put("/api/v1/businesses/" + businessId + "/configuration")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "weeklyBookingCopyEnabled": true
+                                  "weeklyBookingCopyEnabled": true,
+                                  "depositEnabled": true
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.businessId").value(businessId))
-                .andExpect(jsonPath("$.weeklyBookingCopyEnabled").value(true));
+                .andExpect(jsonPath("$.weeklyBookingCopyEnabled").value(true))
+                .andExpect(jsonPath("$.depositEnabled").value(true));
+
+        mockMvc.perform(get("/api/v1/businesses/" + businessId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.depositEnabled").value(true));
+
+        mockMvc.perform(get("/api/v1/businesses/" + UUID.randomUUID() + "/configuration")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Business not found"));
     }
 
     @Test

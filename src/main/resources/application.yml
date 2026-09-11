@@ -86,7 +86,7 @@ app:
   security:
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:}
-      allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
+      allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,PATCH,DELETE,OPTIONS}
       allowed-headers: ${CORS_ALLOWED_HEADERS:Authorization,Content-Type}
       exposed-headers: ${CORS_EXPOSED_HEADERS:Location}
       allow-credentials: ${CORS_ALLOW_CREDENTIALS:false}

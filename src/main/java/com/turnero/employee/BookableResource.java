@@ -188,9 +188,10 @@ public class BookableResource {
 
     public void replaceAbsences(List<AbsenceValue> values) {
         absences.clear();
-        values.forEach(value -> absences.add(new ResourceAbsence(
+            values.forEach(value -> absences.add(new ResourceAbsence(
                 this,
                 value.date(),
+                value.allDay(),
                 value.startsAt(),
                 value.endsAt()
         )));
@@ -203,6 +204,6 @@ public class BookableResource {
     record WorkingIntervalValue(DayOfWeek dayOfWeek, LocalTime startsAt, LocalTime endsAt) {
     }
 
-    record AbsenceValue(LocalDate date, LocalTime startsAt, LocalTime endsAt) {
+    record AbsenceValue(LocalDate date, boolean allDay, LocalTime startsAt, LocalTime endsAt) {
     }
 }

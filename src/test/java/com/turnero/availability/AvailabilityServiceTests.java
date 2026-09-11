@@ -9,6 +9,9 @@ import com.turnero.booking.BookingRepository;
 import com.turnero.branch.Branch;
 import com.turnero.branch.BranchOpeningInterval;
 import com.turnero.branch.BranchRepository;
+import com.turnero.branch.BranchScheduleExceptionRepository;
+import com.turnero.branch.BranchScheduleException;
+import com.turnero.branch.BranchScheduleExceptionType;
 import com.turnero.branch.BranchStatus;
 import com.turnero.business.Business;
 import com.turnero.employee.BookableResource;
@@ -56,6 +59,9 @@ class AvailabilityServiceTests {
     @Mock
     private BookingRepository bookingRepository;
 
+    @Mock
+    private BranchScheduleExceptionRepository scheduleExceptionRepository;
+
     private AvailabilityService availabilityService;
     private UUID branchId;
     private UUID businessId;
@@ -70,11 +76,14 @@ class AvailabilityServiceTests {
                 serviceOfferingRepository,
                 resourceRepository,
                 bookingRepository,
+                scheduleExceptionRepository,
                 15
         );
         branchId = UUID.randomUUID();
         businessId = UUID.randomUUID();
         serviceId = UUID.randomUUID();
+        when(scheduleExceptionRepository.findByBranchIdAndDate(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(Optional.empty());
     }
 
     @Test
@@ -92,6 +101,46 @@ class AvailabilityServiceTests {
         List<AvailabilitySlotResponse> slots = availabilityService.findAvailableSlots(branchId, serviceId, MONDAY);
 
         assertThat(slots).isEmpty();
+    }
+
+    @Test
+    void branchClosedExceptionOverridesWeeklySchedule() {
+        arrangeBranchAndService(30, List.of(open(DayOfWeek.MONDAY, "09:00", "12:00")), null);
+        BranchScheduleException exception = mock(BranchScheduleException.class);
+        when(exception.getType()).thenReturn(BranchScheduleExceptionType.CLOSED);
+        when(scheduleExceptionRepository.findByBranchIdAndDate(branchId, MONDAY)).thenReturn(Optional.of(exception));
+
+        assertThat(availabilityService.findAvailableSlots(branchId, serviceId, MONDAY)).isEmpty();
+    }
+
+    @Test
+    void customHoursReplaceWeeklyBranchSchedule() {
+        arrangeBranchAndService(30, List.of(open(DayOfWeek.MONDAY, "09:00", "12:00")), null);
+        BookableResource resource = resource("Ana",
+                List.of(work(DayOfWeek.MONDAY, "09:00", "18:00")), List.of());
+        arrangeResources(List.of(resource), List.of());
+        BranchScheduleException exception = mock(BranchScheduleException.class);
+        when(exception.getType()).thenReturn(BranchScheduleExceptionType.CUSTOM_HOURS);
+        when(exception.getStartTime()).thenReturn(LocalTime.of(15, 0));
+        when(exception.getEndTime()).thenReturn(LocalTime.of(16, 0));
+        when(scheduleExceptionRepository.findByBranchIdAndDate(branchId, MONDAY)).thenReturn(Optional.of(exception));
+
+        assertThat(availabilityService.findAvailableSlots(branchId, serviceId, MONDAY))
+                .extracting(AvailabilitySlotResponse::startsAt)
+                .containsExactly(LocalTime.of(15, 0), LocalTime.of(15, 30));
+    }
+
+    @Test
+    void allDayAbsenceRemovesEveryResourceSlot() {
+        arrangeBranchAndService(30, List.of(open(DayOfWeek.MONDAY, "09:00", "12:00")), null);
+        ResourceAbsence absence = mock(ResourceAbsence.class);
+        when(absence.getDate()).thenReturn(MONDAY);
+        when(absence.isAllDay()).thenReturn(true);
+        BookableResource resource = resource("Ana",
+                List.of(work(DayOfWeek.MONDAY, "09:00", "12:00")), List.of(absence));
+        arrangeResources(List.of(resource), List.of());
+
+        assertThat(availabilityService.findAvailableSlots(branchId, serviceId, MONDAY)).isEmpty();
     }
 
     @Test
@@ -163,6 +212,29 @@ class AvailabilityServiceTests {
 
         assertThat(starts).contains(LocalTime.of(9, 0), LocalTime.of(9, 30), LocalTime.of(10, 30));
         assertThat(starts).doesNotContain(LocalTime.of(9, 45), LocalTime.of(10, 0), LocalTime.of(10, 15));
+    }
+
+    @Test
+    void excludedBookingDoesNotBlockItsOwnSlot() {
+        arrangeBranchAndService(30, List.of(open(DayOfWeek.MONDAY, "09:00", "12:00")), null);
+        BookableResource resource = resource("Ana", List.of(work(DayOfWeek.MONDAY, "09:00", "12:00")), List.of());
+        Booking booking = booking(resource, "10:00", "10:30");
+        UUID bookingId = UUID.randomUUID();
+        when(booking.getId()).thenReturn(bookingId);
+        when(resourceRepository.findById(resource.getId())).thenReturn(Optional.of(resource));
+        arrangeResources(List.of(resource), List.of(booking));
+
+        List<LocalTime> starts = availabilityService.findAvailableSlots(
+                        branchId,
+                        serviceId,
+                        MONDAY,
+                        resource.getId(),
+                        bookingId
+                ).stream()
+                .map(AvailabilitySlotResponse::startsAt)
+                .toList();
+
+        assertThat(starts).contains(LocalTime.of(10, 0));
     }
 
     @Test

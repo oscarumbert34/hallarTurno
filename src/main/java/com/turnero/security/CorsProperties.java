@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class CorsProperties {
 
     private List<String> allowedOrigins = new ArrayList<>();
-    private List<String> allowedMethods = new ArrayList<>(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+    private List<String> allowedMethods = new ArrayList<>(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     private List<String> allowedHeaders = new ArrayList<>(List.of("Authorization", "Content-Type"));
     private List<String> exposedHeaders = new ArrayList<>(List.of("Location"));
     private boolean allowCredentials;

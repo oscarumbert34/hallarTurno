@@ -74,7 +74,7 @@ Variables CORS:
 | Variable | Uso | Default |
 | --- | --- | --- |
 | `CORS_ALLOWED_ORIGINS` | Origenes permitidos separados por coma. En produccion debe contener dominios concretos. | vacio |
-| `CORS_ALLOWED_METHODS` | Metodos permitidos separados por coma. | `GET,POST,PUT,DELETE,OPTIONS` |
+| `CORS_ALLOWED_METHODS` | Metodos permitidos separados por coma. | `GET,POST,PUT,PATCH,DELETE,OPTIONS` |
 | `CORS_ALLOWED_HEADERS` | Headers permitidos separados por coma. | `Authorization,Content-Type` |
 | `CORS_EXPOSED_HEADERS` | Headers expuestos al frontend separados por coma. | `Location` |
 | `CORS_ALLOW_CREDENTIALS` | Permite credenciales CORS. Si es `true`, no se permite `*` como origen. | `false` |
@@ -415,13 +415,46 @@ Endpoints protegidos de reservas:
 - `POST /api/v1/public/bookings` para reservas publicas sin sesion
 - `POST /api/v1/bookings` para reservas autenticadas
 - `POST /api/v1/bookings/{id}/cancel`
+- `PUT /api/v1/bookings/{id}/reschedule`
+- `PATCH /api/v1/bookings/{id}/deposit-status`
 - `POST /api/v1/businesses/{businessId}/bookings/copy-week`
 - `GET /api/v1/businesses/{businessId}/bookings`
 - `GET /api/v1/businesses/{businessId}/customer-contacts/search?phone={phone}` (publico; devuelve `emailRequired`)
 
 Las reservas requieren `customerName` y `customerPhone`; `customerEmail` es opcional. Al crear una reserva, el backend busca o crea un contacto de cliente para ese negocio usando el telefono normalizado como identificador unico, y guarda snapshot de contacto, servicio, recurso, duracion, precio y moneda. La cancelacion minima permite cancelar al cliente de la reserva, al owner del negocio o a `ADMIN`. El listado por negocio es paginado (`page`, `size`; maximo `50`), admite filtros opcionales `date`, `dateFrom`, `dateTo`, `branchId`, `resourceId` y `serviceOfferingId`, y solo lo puede consultar el owner del negocio o `ADMIN`. Devuelve contrato estable con `page`, `size`, `maxSize`, `totalElements`, `totalPages`, `hasMore`, `sort` y `results`; el orden es cronologico ascendente por `startsAt` y luego `id` (`startsAt:asc,id:asc`). Si se informa `date`, el filtro aplica sobre la fecha local del turno en la zona horaria de la sucursal. Para rangos, `dateFrom` y `dateTo` deben enviarse juntos y son inclusivos. Para evitar doble booking se revalida disponibilidad dentro de la transaccion y PostgreSQL aplica una constraint de exclusion por recurso y rango horario para reservas activas; cuando el slot ya fue tomado, la API responde `409 Conflict`.
 
+La reprogramacion conserva la reserva y sus snapshots historicos, acepta `resourceId` opcional y excluye la propia reserva al validar disponibilidad. Solo puede realizarla el owner del negocio o `ADMIN`. Si el turno queda programado para hoy en la zona horaria de la sucursal, envia un email de reprogramacion despues del commit. Para cualquier otra fecha no envia ese email y limpia la marca de recordatorio para que el job pueda notificar el nuevo turno.
+
+### Senas de reservas
+
+Los negocios exponen `depositEnabled`, con valor inicial `false`, tanto en sus DTOs como en `GET/PUT /api/v1/businesses/{businessId}/configuration`. Al crear una reserva se puede enviar `depositPaid`. Si las senas estan deshabilitadas, la reserva queda en `NOT_REQUIRED`; si estan habilitadas queda en `PENDING` por defecto o en `PAID` cuando `depositPaid` es `true`. Todas las respuestas de reservas incluyen `depositStatus`.
+
+El owner del negocio o un `ADMIN` puede cambiar una sena habilitada mediante `PATCH /api/v1/bookings/{bookingId}/deposit-status`, enviando `{"depositStatus":"PAID"}` o `{"depositStatus":"PENDING"}`. `NOT_REQUIRED` se asigna automaticamente solo cuando el negocio no utiliza senas.
+
+```json
+PUT /api/v1/bookings/{bookingId}/reschedule
+
+{
+  "date": "2026-09-15",
+  "startTime": "17:00",
+  "resourceId": "00000000-0000-0000-0000-000000000000"
+}
+```
+
 La busqueda de contacto por telefono es protegida y solo la puede usar el owner del negocio o `ADMIN`. Si existe, responde el contacto; si no, devuelve `404 Customer contact not found`. El frontend puede usar ese `404` para pedir email al cliente final antes de crear el turno.
+
+### Excepciones de agenda
+
+Las ausencias de recursos admiten tanto rangos parciales como dias completos. Para un dia completo se envia `{"date":"2026-09-15","allDay":true}`; para un rango parcial se puede enviar `{"date":"2026-09-15","startTime":"14:00","endTime":"17:00"}`. Los nombres anteriores `startsAt` y `endsAt` siguen siendo aceptados. No se permiten rangos invertidos, solapamientos ni combinar una ausencia de dia completo con otras ausencias para la misma fecha.
+
+Endpoints protegidos de excepciones de sucursal (owner o `ADMIN`):
+
+- `POST /api/v1/branches/{branchId}/schedule-exceptions`
+- `GET /api/v1/branches/{branchId}/schedule-exceptions`
+- `PUT /api/v1/branches/{branchId}/schedule-exceptions/{id}`
+- `DELETE /api/v1/branches/{branchId}/schedule-exceptions/{id}`
+
+`CLOSED` no admite horas y cierra la sucursal durante toda la fecha. `CUSTOM_HOURS` requiere `startTime < endTime` y reemplaza el horario semanal de la sucursal para esa fecha. Solo puede existir una excepcion por sucursal y fecha. La disponibilidad aplica, en orden: agenda semanal de sucursal, excepcion puntual, agenda del recurso, ausencias, reservas y generacion de slots, siempre en la zona horaria de la sucursal.
 
 ```text
 GET /api/v1/businesses/{businessId}/customer-contacts/search?phone=%2B54%2011%205555-1234

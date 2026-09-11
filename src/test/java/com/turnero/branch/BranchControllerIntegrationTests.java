@@ -191,6 +191,42 @@ class BranchControllerIntegrationTests {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void ownerManagesScheduleExceptionsAndDuplicateDateIsRejected() throws Exception {
+        String token = registerAndGetToken("branch-exceptions@example.com");
+        String businessId = createBusiness(token, "Negocio Excepciones");
+        String branchId = createBranch(token, businessId, "Sucursal Excepciones");
+        String response = mockMvc.perform(post("/api/v1/branches/" + branchId + "/schedule-exceptions")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2026-09-15\",\"type\":\"CLOSED\",\"reason\":\"Feriado\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.type").value("CLOSED"))
+                .andReturn().getResponse().getContentAsString();
+        String id = objectMapper.readTree(response).get("id").asText();
+
+        mockMvc.perform(post("/api/v1/branches/" + branchId + "/schedule-exceptions")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2026-09-15\",\"type\":\"CLOSED\"}"))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(put("/api/v1/branches/" + branchId + "/schedule-exceptions/" + id)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2026-09-15\",\"type\":\"CUSTOM_HOURS\",\"startTime\":\"14:00\",\"endTime\":\"17:00\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.startTime").value("14:00:00"));
+
+        mockMvc.perform(get("/api/v1/branches/" + branchId + "/schedule-exceptions")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
+
+        mockMvc.perform(delete("/api/v1/branches/" + branchId + "/schedule-exceptions/" + id)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+    }
+
     private String registerAndGetToken(String email) throws Exception {
         String response = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

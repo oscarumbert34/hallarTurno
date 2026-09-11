@@ -38,9 +38,30 @@ public record BookingRequest(
         @Size(max = 320)
         String customerEmail,
 
-        Boolean skipCustomerContact
+        Boolean skipCustomerContact,
+
+        Boolean depositPaid
 ) {
+    public BookingRequest(
+            UUID branchId,
+            UUID serviceOfferingId,
+            UUID resourceId,
+            LocalDate date,
+            LocalTime startsAt,
+            String customerName,
+            String customerPhone,
+            String customerEmail,
+            Boolean skipCustomerContact
+    ) {
+        this(branchId, serviceOfferingId, resourceId, date, startsAt, customerName, customerPhone,
+                customerEmail, skipCustomerContact, null);
+    }
+
     public boolean shouldSkipCustomerContact() {
         return Boolean.TRUE.equals(skipCustomerContact);
+    }
+
+    public boolean isDepositPaid() {
+        return Boolean.TRUE.equals(depositPaid);
     }
 }

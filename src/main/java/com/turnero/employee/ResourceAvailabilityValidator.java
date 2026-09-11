@@ -53,11 +53,13 @@ class ResourceAvailabilityValidator {
         List<BookableResource.AbsenceValue> values = new ArrayList<>();
         for (Map.Entry<LocalDate, List<ResourceAbsenceRequest>> entry : absencesByDate.entrySet()) {
             List<ResourceAbsenceRequest> sorted = entry.getValue().stream()
-                    .sorted(Comparator.comparing(ResourceAbsenceRequest::startsAt))
+                    .sorted(Comparator.comparing(ResourceAbsenceRequest::isAllDay).reversed()
+                            .thenComparing(ResourceAbsenceRequest::startsAt, Comparator.nullsFirst(Comparator.naturalOrder())))
                     .toList();
             validateAbsencesForDate(entry.getKey(), sorted);
             sorted.forEach(absence -> values.add(new BookableResource.AbsenceValue(
                     absence.date(),
+                    absence.isAllDay(),
                     absence.startsAt(),
                     absence.endsAt()
             )));
@@ -89,6 +91,19 @@ class ResourceAvailabilityValidator {
     private void validateAbsencesForDate(LocalDate date, List<ResourceAbsenceRequest> absences) {
         ResourceAbsenceRequest previous = null;
         for (ResourceAbsenceRequest absence : absences) {
+            if (absence.isAllDay()) {
+                if (absence.startsAt() != null || absence.endsAt() != null) {
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "All-day resource absence cannot define start or end time");
+                }
+                if (absences.size() > 1) {
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "All-day resource absence cannot overlap another absence for " + date);
+                }
+                previous = absence;
+                continue;
+            }
+            if (absence.startsAt() == null || absence.endsAt() == null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "Resource absence start and end are required");
+            }
             if (!absence.startsAt().isBefore(absence.endsAt())) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "Resource absence start must be before end");
             }

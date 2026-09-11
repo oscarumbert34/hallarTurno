@@ -49,6 +49,9 @@ public class Business {
     @Column(name = "contact_email", length = 320)
     private String contactEmail;
 
+    @Column(name = "deposit_enabled", nullable = false)
+    private boolean depositEnabled;
+
     @NotBlank
     @Column(nullable = false, length = 180)
     private String slug;
@@ -79,7 +82,8 @@ public class Business {
             String phone,
             String contactEmail,
             String slug,
-            BusinessStatus status
+            BusinessStatus status,
+            boolean depositEnabled
     ) {
         this.owner = owner;
         this.name = name;
@@ -88,6 +92,7 @@ public class Business {
         this.contactEmail = contactEmail;
         this.slug = slug;
         this.status = status;
+        this.depositEnabled = depositEnabled;
     }
 
     public static Business create(
@@ -99,7 +104,20 @@ public class Business {
             String slug,
             BusinessStatus status
     ) {
-        return new Business(owner, name, shortDescription, phone, contactEmail, slug, status);
+        return create(owner, name, shortDescription, phone, contactEmail, slug, status, false);
+    }
+
+    public static Business create(
+            User owner,
+            String name,
+            String shortDescription,
+            String phone,
+            String contactEmail,
+            String slug,
+            BusinessStatus status,
+            boolean depositEnabled
+    ) {
+        return new Business(owner, name, shortDescription, phone, contactEmail, slug, status, depositEnabled);
     }
 
     @PrePersist
@@ -137,6 +155,10 @@ public class Business {
         return status;
     }
 
+    public boolean isDepositEnabled() {
+        return depositEnabled;
+    }
+
     public User getOwner() {
         return owner;
     }
@@ -154,5 +176,9 @@ public class Business {
         this.shortDescription = shortDescription;
         this.phone = phone;
         this.contactEmail = contactEmail;
+    }
+
+    public void updateDepositEnabled(boolean depositEnabled) {
+        this.depositEnabled = depositEnabled;
     }
 }

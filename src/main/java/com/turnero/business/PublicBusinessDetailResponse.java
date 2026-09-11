@@ -10,6 +10,7 @@ public record PublicBusinessDetailResponse(
         String shortDescription,
         String phone,
         String email,
+        boolean depositEnabled,
         List<PublicBusinessBranchResponse> branches
 ) {
 }

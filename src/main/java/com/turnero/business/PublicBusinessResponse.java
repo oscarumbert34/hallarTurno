@@ -9,7 +9,8 @@ public record PublicBusinessResponse(
         String phone,
         String contactEmail,
         String slug,
-        BusinessStatus status
+        BusinessStatus status,
+        boolean depositEnabled
 ) {
 
     static PublicBusinessResponse from(Business business) {
@@ -20,7 +21,8 @@ public record PublicBusinessResponse(
                 business.getPhone(),
                 business.getContactEmail(),
                 business.getSlug(),
-                business.getStatus()
+                business.getStatus(),
+                business.isDepositEnabled()
         );
     }
 }

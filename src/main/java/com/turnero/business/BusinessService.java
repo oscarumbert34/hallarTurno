@@ -51,7 +51,8 @@ public class BusinessService {
                 this.blankToNull(request.phone()),
                 this.blankToNull(request.contactEmail()),
                 slug,
-                this.properties.getInitialStatus()
+                this.properties.getInitialStatus(),
+                request.isDepositEnabled()
         );
         final Business saved = this.businessRepository.saveAndFlush(business);
         this.configurationRepository.saveAndFlush(BusinessConfiguration.createDefault(saved));
@@ -90,6 +91,9 @@ public class BusinessService {
                 this.blankToNull(request.phone()),
                 this.blankToNull(request.contactEmail())
         );
+        if (request.depositEnabled() != null) {
+            business.updateDepositEnabled(request.depositEnabled());
+        }
         return BusinessResponse.from(business);
     }
 
@@ -110,6 +114,9 @@ public class BusinessService {
         this.ownershipGuard.requireOwnerOrAdmin(business, currentUser, "Business can only be managed by its owner or an admin");
         final BusinessConfiguration configuration = this.findOrCreateConfiguration(business);
         configuration.updateWeeklyBookingCopyEnabled(request.weeklyBookingCopyEnabled());
+        if (request.depositEnabled() != null) {
+            business.updateDepositEnabled(request.depositEnabled());
+        }
         return BusinessConfigurationResponse.from(configuration);
     }
 

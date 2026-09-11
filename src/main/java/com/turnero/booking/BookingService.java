@@ -135,6 +135,7 @@ public class BookingService {
                 ? null
                 : this.resolveCustomerContact(request, branch, customer);
         String customerEmailSnapshot = resolveCustomerEmailSnapshot(request, customerContact);
+        DepositStatus depositStatus = resolveDepositStatus(branch.getBusiness(), request.depositPaid());
 
         Booking booking = Booking.create(
                 branch,
@@ -153,7 +154,8 @@ public class BookingService {
                 serviceOffering.getDurationMinutes(),
                 serviceOffering.getPrice(),
                 serviceOffering.getCurrency(),
-                BookingStatus.CONFIRMED
+                BookingStatus.CONFIRMED,
+                depositStatus
         );
         try {
             Booking savedBooking = bookingRepository.saveAndFlush(booking);
@@ -237,6 +239,109 @@ public class BookingService {
         assertCanCancel(booking, currentUser);
         booking.cancel(cancelledBy, Instant.now(clock));
         return BookingResponse.from(booking);
+    }
+
+    @Transactional
+    public BookingResponse reschedule(
+            UUID id,
+            BookingRescheduleRequest request,
+            AuthenticatedUser currentUser
+    ) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
+        ownershipGuard.requireOwnerOrAdmin(
+                booking.getBusiness(),
+                currentUser,
+                "Booking can only be rescheduled by the business owner or an admin"
+        );
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new ApiException(HttpStatus.CONFLICT, "Cancelled booking cannot be rescheduled");
+        }
+
+        BookableResource resource = request.resourceId() == null
+                ? booking.getResource()
+                : resourceRepository.findById(request.resourceId())
+                        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Bookable resource not found"));
+        assertConsistentRequest(booking.getBranch(), booking.getServiceOffering(), resource);
+        assertRescheduleSlotAvailable(booking, resource, request);
+
+        ZoneId zoneId = ZoneId.of(booking.getBranch().getZoneId());
+        Instant startsAt = LocalDateTime.of(request.date(), request.startTime()).atZone(zoneId).toInstant();
+        Instant endsAt = startsAt.plus(Duration.ofMinutes(booking.getDurationMinutesSnapshot()));
+        boolean rescheduledForToday = request.date().equals(LocalDate.now(clock.withZone(zoneId)));
+        booking.reschedule(resource, startsAt, endsAt, !rescheduledForToday);
+
+        try {
+            Booking savedBooking = bookingRepository.saveAndFlush(booking);
+            if (rescheduledForToday) {
+                sendRescheduleEmailAfterCommit(savedBooking);
+            }
+            log.info("booking rescheduled id={} resourceId={} startsAt={}", id, resource.getId(), startsAt);
+            return BookingResponse.from(savedBooking);
+        } catch (DataIntegrityViolationException exception) {
+            meterRegistry.counter("turnero.bookings.conflicts").increment();
+            throw new ApiException(HttpStatus.CONFLICT, "Booking slot is already taken");
+        }
+    }
+
+    @Transactional
+    public BookingResponse updateDepositStatus(
+            UUID id,
+            BookingDepositStatusRequest request,
+            AuthenticatedUser currentUser
+    ) {
+        Booking booking = bookingRepository.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Booking not found"));
+        ownershipGuard.requireOwnerOrAdmin(
+                booking.getBusiness(),
+                currentUser,
+                "Booking deposit status can only be modified by the business owner or an admin"
+        );
+        if (!booking.getBusiness().isDepositEnabled()) {
+            throw new ApiException(HttpStatus.CONFLICT, "Deposits are not enabled for this business");
+        }
+        if (request.depositStatus() == DepositStatus.NOT_REQUIRED) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "Deposit status must be PENDING or PAID when deposits are enabled");
+        }
+        booking.updateDepositStatus(request.depositStatus());
+        return BookingResponse.from(booking);
+    }
+
+    private void assertRescheduleSlotAvailable(
+            Booking booking,
+            BookableResource resource,
+            BookingRescheduleRequest request
+    ) {
+        boolean available = availabilityService.findAvailableSlots(
+                        booking.getBranch().getId(),
+                        booking.getServiceOffering().getId(),
+                        request.date(),
+                        resource.getId(),
+                        booking.getId()
+                ).stream()
+                .anyMatch(slot -> slot.startsAt().equals(request.startTime())
+                        && slot.resourceId().equals(resource.getId()));
+        if (!available) {
+            meterRegistry.counter("turnero.bookings.conflicts").increment();
+            throw new ApiException(HttpStatus.CONFLICT, "Booking slot is not available");
+        }
+    }
+
+    private void sendRescheduleEmailAfterCommit(Booking booking) {
+        if (booking.getCustomerEmailSnapshot() == null || booking.getCustomerEmailSnapshot().isBlank()) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            bookingConfirmationEmailService.sendReschedule(booking);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                bookingConfirmationEmailService.sendReschedule(booking);
+            }
+        });
     }
 
     @Transactional
@@ -554,7 +659,8 @@ public class BookingService {
                 source.getDurationMinutesSnapshot(),
                 source.getPriceSnapshot(),
                 source.getCurrencySnapshot(),
-                source.getStatus()
+                source.getStatus(),
+                source.getBusiness().isDepositEnabled() ? DepositStatus.PENDING : DepositStatus.NOT_REQUIRED
         );
         Booking saved = bookingRepository.save(copied);
         created.add(new WeeklyBookingCopyCreated(
@@ -657,6 +763,13 @@ public class BookingService {
             );
             throw new ApiException(HttpStatus.CONFLICT, "Booking slot is not available");
         }
+    }
+
+    private DepositStatus resolveDepositStatus(Business business, Boolean depositPaid) {
+        if (!business.isDepositEnabled()) {
+            return DepositStatus.NOT_REQUIRED;
+        }
+        return Boolean.TRUE.equals(depositPaid) ? DepositStatus.PAID : DepositStatus.PENDING;
     }
 
     private void assertConsistentRequest(

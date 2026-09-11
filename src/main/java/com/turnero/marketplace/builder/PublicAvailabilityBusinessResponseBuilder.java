@@ -36,6 +36,7 @@ public final class PublicAvailabilityBusinessResponseBuilder {
                 business.getName(),
                 business.getShortDescription(),
                 business.getSlug(),
+                business.isDepositEnabled(),
                 branches
         );
     }

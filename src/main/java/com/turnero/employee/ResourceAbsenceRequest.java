@@ -1,5 +1,6 @@
 package com.turnero.employee;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -8,10 +9,19 @@ public record ResourceAbsenceRequest(
         @NotNull
         LocalDate date,
 
-        @NotNull
+        Boolean allDay,
+
+        @JsonAlias("startTime")
         LocalTime startsAt,
 
-        @NotNull
+        @JsonAlias("endTime")
         LocalTime endsAt
 ) {
+    public ResourceAbsenceRequest(LocalDate date, LocalTime startsAt, LocalTime endsAt) {
+        this(date, false, startsAt, endsAt);
+    }
+
+    public boolean isAllDay() {
+        return Boolean.TRUE.equals(allDay);
+    }
 }

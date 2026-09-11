@@ -8,6 +8,7 @@ public record PublicAvailabilityBusinessResponse(
         String name,
         String shortDescription,
         String slug,
+        boolean depositEnabled,
         List<PublicAvailabilityBranchResponse> branches
 ) {
 }

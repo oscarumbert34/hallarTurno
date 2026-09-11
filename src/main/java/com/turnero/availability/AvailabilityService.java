@@ -6,6 +6,9 @@ import com.turnero.booking.BookingStatus;
 import com.turnero.branch.Branch;
 import com.turnero.branch.BranchOpeningInterval;
 import com.turnero.branch.BranchRepository;
+import com.turnero.branch.BranchScheduleException;
+import com.turnero.branch.BranchScheduleExceptionRepository;
+import com.turnero.branch.BranchScheduleExceptionType;
 import com.turnero.branch.BranchStatus;
 import com.turnero.common.ApiException;
 import com.turnero.employee.BookableResource;
@@ -45,6 +48,7 @@ public class AvailabilityService {
     private final ServiceOfferingRepository serviceOfferingRepository;
     private final BookableResourceRepository resourceRepository;
     private final BookingRepository bookingRepository;
+    private final BranchScheduleExceptionRepository scheduleExceptionRepository;
     private final Duration slotGranularity;
 
     public AvailabilityService(
@@ -52,12 +56,14 @@ public class AvailabilityService {
             ServiceOfferingRepository serviceOfferingRepository,
             BookableResourceRepository resourceRepository,
             BookingRepository bookingRepository,
+            BranchScheduleExceptionRepository scheduleExceptionRepository,
             @Value("${availability.slot-granularity-minutes:15}") long slotGranularityMinutes
     ) {
         this.branchRepository = branchRepository;
         this.serviceOfferingRepository = serviceOfferingRepository;
         this.resourceRepository = resourceRepository;
         this.bookingRepository = bookingRepository;
+        this.scheduleExceptionRepository = scheduleExceptionRepository;
         this.slotGranularity = Duration.ofMinutes(slotGranularityMinutes);
     }
 
@@ -67,6 +73,17 @@ public class AvailabilityService {
             UUID serviceOfferingId,
             LocalDate date,
             UUID resourceId
+    ) {
+        return findAvailableSlots(branchId, serviceOfferingId, date, resourceId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AvailabilitySlotResponse> findAvailableSlots(
+            UUID branchId,
+            UUID serviceOfferingId,
+            LocalDate date,
+            UUID resourceId,
+            UUID excludedBookingId
     ) {
         if (date == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Availability date is required");
@@ -86,17 +103,25 @@ public class AvailabilityService {
         }
 
         ZoneId zoneId = ZoneId.of(branch.getZoneId());
+        Optional<BranchScheduleException> scheduleException =
+                scheduleExceptionRepository.findByBranchIdAndDate(branch.getId(), date);
+        if (scheduleException.filter(value -> value.getType() == BranchScheduleExceptionType.CLOSED).isPresent()) {
+            return List.of();
+        }
         List<Booking> bookings = bookingRepository.findByBranchIdAndStatusInAndStartsAtLessThanAndEndsAtGreaterThan(
                 branch.getId(),
                 ACTIVE_BOOKING_STATUSES,
                 dayEnd(date, zoneId),
                 dayStart(date, zoneId)
-        );
+        ).stream()
+                .filter(booking -> excludedBookingId == null || !booking.getId().equals(excludedBookingId))
+                .toList();
         List<BookableResource> resources = findCandidateResources(branch, serviceOffering, resourceId);
 
         return resources.stream()
                 .filter(resource -> canOfferService(resource, serviceOffering))
-                .flatMap(resource -> calculateSlots(branch, serviceOffering, resource, date, zoneId, bookings).stream())
+                .flatMap(resource -> calculateSlots(branch, serviceOffering, resource, date, zoneId, bookings,
+                        scheduleException.orElse(null)).stream())
                 .sorted(Comparator.comparing(AvailabilitySlotResponse::startsAt)
                         .thenComparing(AvailabilitySlotResponse::resourceName)
                         .thenComparing(AvailabilitySlotResponse::resourceId))
@@ -139,9 +164,14 @@ public class AvailabilityService {
             BookableResource resource,
             LocalDate date,
             ZoneId zoneId,
-            List<Booking> bookings
+            List<Booking> bookings,
+            BranchScheduleException scheduleException
     ) {
-        List<TimeRange> openingRanges = intervalsForDay(branch.getOpeningIntervals(), date);
+        List<TimeRange> openingRanges = scheduleException != null
+                && scheduleException.getType() == BranchScheduleExceptionType.CUSTOM_HOURS
+                ? List.of(new TimeRange(LocalDateTime.of(date, scheduleException.getStartTime()),
+                        LocalDateTime.of(date, scheduleException.getEndTime())))
+                : intervalsForDay(branch.getOpeningIntervals(), date);
         List<TimeRange> workingRanges = workingIntervalsForDay(resource.getWorkingIntervals(), date);
         if (openingRanges.isEmpty() || workingRanges.isEmpty()) {
             return List.of();
@@ -200,8 +230,8 @@ public class AvailabilityService {
         List<TimeRange> absences = resource.getAbsences().stream()
                 .filter(absence -> absence.getDate().equals(date))
                 .map(absence -> new TimeRange(
-                        LocalDateTime.of(date, absence.getStartsAt()),
-                        LocalDateTime.of(date, absence.getEndsAt())
+                        absence.isAllDay() ? date.atStartOfDay() : LocalDateTime.of(date, absence.getStartsAt()),
+                        absence.isAllDay() ? date.plusDays(1).atStartOfDay() : LocalDateTime.of(date, absence.getEndsAt())
                 ))
                 .toList();
         List<TimeRange> booked = bookings.stream()

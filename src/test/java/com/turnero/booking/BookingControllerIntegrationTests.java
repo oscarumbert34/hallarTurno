@@ -2,6 +2,7 @@ package com.turnero.booking;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.turnero.customer.CustomerContactRepository;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -138,6 +140,153 @@ class BookingControllerIntegrationTests {
         mockMvc.perform(post("/api/v1/bookings/" + secondBookingId + "/cancel")
                         .header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void businessOwnerCanRescheduleBookingAndTheCurrentBookingDoesNotBlockItself() throws Exception {
+        Fixture fixture = fixture("booking-reschedule");
+        String bookingId = createBooking(fixture.customerToken(), fixture, "09:00");
+
+        mockMvc.perform(put("/api/v1/bookings/" + bookingId + "/reschedule")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "date": "2026-09-07",
+                                  "startTime": "09:30"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(bookingId))
+                .andExpect(jsonPath("$.startsAt").value("2026-09-07T12:30:00Z"))
+                .andExpect(jsonPath("$.endsAt").value("2026-09-07T13:00:00Z"))
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+    }
+
+    @Test
+    void bookingDepositStatusFollowsBusinessConfiguration() throws Exception {
+        Fixture disabled = fixture("booking-deposit-disabled");
+
+        mockMvc.perform(post("/api/v1/bookings")
+                        .header("Authorization", "Bearer " + disabled.customerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJsonWithDepositPaid(disabled, "09:00", true)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.depositStatus").value("NOT_REQUIRED"));
+
+        Fixture enabled = fixture("booking-deposit-enabled");
+        enableDeposits(enabled.ownerToken(), enabled.businessId());
+
+        mockMvc.perform(post("/api/v1/bookings")
+                        .header("Authorization", "Bearer " + enabled.customerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJsonWithDepositPaid(enabled, "09:00", false)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.depositStatus").value("PENDING"));
+
+        mockMvc.perform(post("/api/v1/bookings")
+                        .header("Authorization", "Bearer " + enabled.customerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookingJsonWithDepositPaid(enabled, "09:30", true)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.depositStatus").value("PAID"));
+    }
+
+    @Test
+    void ownerCanChangeDepositBetweenPendingAndPaid() throws Exception {
+        Fixture fixture = fixture("booking-deposit-change");
+        enableDeposits(fixture.ownerToken(), fixture.businessId());
+        String bookingId = createBooking(fixture.customerToken(), fixture, "09:00");
+
+        mockMvc.perform(patch("/api/v1/bookings/" + bookingId + "/deposit-status")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"depositStatus\":\"PAID\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.depositStatus").value("PAID"));
+
+        mockMvc.perform(patch("/api/v1/bookings/" + bookingId + "/deposit-status")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"depositStatus\":\"PENDING\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.depositStatus").value("PENDING"));
+    }
+
+    @Test
+    void depositUpdateRejectsMissingBookingForeignUserAndDisabledBusiness() throws Exception {
+        Fixture fixture = fixture("booking-deposit-rules");
+        String bookingId = createBooking(fixture.customerToken(), fixture, "09:00");
+        String otherOwnerToken = registerAndGetToken("booking-deposit-other@example.com", "BUSINESS");
+
+        mockMvc.perform(patch("/api/v1/bookings/" + bookingId + "/deposit-status")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"depositStatus\":\"PAID\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Deposits are not enabled for this business"));
+
+        mockMvc.perform(patch("/api/v1/bookings/" + bookingId + "/deposit-status")
+                        .header("Authorization", "Bearer " + otherOwnerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"depositStatus\":\"PAID\"}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(patch("/api/v1/bookings/" + UUID.randomUUID() + "/deposit-status")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"depositStatus\":\"PAID\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Booking not found"));
+    }
+
+    @Test
+    void rescheduleRejectsOccupiedSlotCancelledBookingAndForeignUser() throws Exception {
+        Fixture fixture = fixture("booking-reschedule-rules");
+        String firstBookingId = createBooking(fixture.customerToken(), fixture, "09:00");
+        String secondBookingId = createBooking(fixture.customerToken(), fixture, "09:30");
+        String otherOwnerToken = registerAndGetToken("booking-reschedule-foreign@example.com", "BUSINESS");
+
+        mockMvc.perform(put("/api/v1/bookings/" + firstBookingId + "/reschedule")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2026-09-07\",\"startTime\":\"09:30\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Booking slot is not available"));
+
+        mockMvc.perform(put("/api/v1/bookings/" + firstBookingId + "/reschedule")
+                        .header("Authorization", "Bearer " + otherOwnerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2026-09-07\",\"startTime\":\"10:00\"}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/bookings/" + secondBookingId + "/cancel")
+                        .header("Authorization", "Bearer " + fixture.ownerToken()))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/bookings/" + secondBookingId + "/reschedule")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2026-09-07\",\"startTime\":\"10:00\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Cancelled booking cannot be rescheduled"));
+    }
+
+    @Test
+    void rescheduleToAnotherDayClearsPreviousReminderForTheReminderJob() throws Exception {
+        Fixture fixture = fixture("booking-reschedule-reminder");
+        String bookingId = createBooking(fixture.customerToken(), fixture, "09:00");
+        Booking booking = bookingRepository.findById(UUID.fromString(bookingId)).orElseThrow();
+        booking.markReminderSent(Instant.parse("2026-09-06T12:00:00Z"));
+        bookingRepository.saveAndFlush(booking);
+
+        mockMvc.perform(put("/api/v1/bookings/" + bookingId + "/reschedule")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"date\":\"2026-09-10\",\"startTime\":\"09:00\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.startsAt").value("2026-09-10T12:00:00Z"));
+
+        assertThat(bookingRepository.findById(UUID.fromString(bookingId)).orElseThrow().getReminderSentAt()).isNull();
     }
 
     @Test
@@ -582,6 +731,15 @@ class BookingControllerIntegrationTests {
                 .andExpect(jsonPath("$.weeklyBookingCopyEnabled").value(true));
     }
 
+    private void enableDeposits(String token, String businessId) throws Exception {
+        mockMvc.perform(put("/api/v1/businesses/" + businessId + "/configuration")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"weeklyBookingCopyEnabled\":false,\"depositEnabled\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.depositEnabled").value(true));
+    }
+
     private String createBranch(String token, String businessId, String name) throws Exception {
         String response = mockMvc.perform(post("/api/v1/businesses/" + businessId + "/branches")
                         .header("Authorization", "Bearer " + token)
@@ -798,6 +956,28 @@ class BookingControllerIntegrationTests {
                 date,
                 startsAt,
                 fixture.prefix()
+        );
+    }
+
+    private String bookingJsonWithDepositPaid(Fixture fixture, String startsAt, boolean depositPaid) {
+        return """
+                {
+                  "branchId": "%s",
+                  "serviceOfferingId": "%s",
+                  "resourceId": "%s",
+                  "date": "2026-09-07",
+                  "startsAt": "%s",
+                  "customerName": "Cliente %s",
+                  "customerPhone": "+54 11 5555-1234",
+                  "depositPaid": %s
+                }
+                """.formatted(
+                fixture.branchId(),
+                fixture.serviceOfferingId(),
+                fixture.resourceId(),
+                startsAt,
+                fixture.prefix(),
+                depositPaid
         );
     }
 

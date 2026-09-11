@@ -96,6 +96,10 @@ public class Booking {
     @Column(nullable = false, length = 32)
     private BookingStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "deposit_status", nullable = false, length = 32)
+    private DepositStatus depositStatus;
+
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
 
@@ -134,7 +138,8 @@ public class Booking {
             Integer durationMinutesSnapshot,
             BigDecimal priceSnapshot,
             String currencySnapshot,
-            BookingStatus status
+            BookingStatus status,
+            DepositStatus depositStatus
     ) {
         this.branch = branch;
         this.business = business;
@@ -153,6 +158,7 @@ public class Booking {
         this.priceSnapshot = priceSnapshot;
         this.currencySnapshot = currencySnapshot;
         this.status = status;
+        this.depositStatus = depositStatus;
     }
 
     public static Booking create(
@@ -174,6 +180,35 @@ public class Booking {
             String currencySnapshot,
             BookingStatus status
     ) {
+        DepositStatus depositStatus = business.isDepositEnabled()
+                ? DepositStatus.PENDING
+                : DepositStatus.NOT_REQUIRED;
+        return create(branch, business, customer, serviceOffering, resource, startsAt, endsAt,
+                serviceNameSnapshot, resourceNameSnapshot, customerNameSnapshot, customerPhoneSnapshot,
+                customerEmailSnapshot, customerContact, durationMinutesSnapshot, priceSnapshot,
+                currencySnapshot, status, depositStatus);
+    }
+
+    public static Booking create(
+            Branch branch,
+            Business business,
+            User customer,
+            ServiceOffering serviceOffering,
+            BookableResource resource,
+            Instant startsAt,
+            Instant endsAt,
+            String serviceNameSnapshot,
+            String resourceNameSnapshot,
+            String customerNameSnapshot,
+            String customerPhoneSnapshot,
+            String customerEmailSnapshot,
+            CustomerContact customerContact,
+            Integer durationMinutesSnapshot,
+            BigDecimal priceSnapshot,
+            String currencySnapshot,
+            BookingStatus status,
+            DepositStatus depositStatus
+    ) {
         return new Booking(
                 branch,
                 business,
@@ -191,7 +226,8 @@ public class Booking {
                 durationMinutesSnapshot,
                 priceSnapshot,
                 currencySnapshot,
-                status
+                status,
+                depositStatus
         );
     }
 
@@ -274,6 +310,10 @@ public class Booking {
         return status;
     }
 
+    public DepositStatus getDepositStatus() {
+        return depositStatus;
+    }
+
     public Instant getCancelledAt() {
         return cancelledAt;
     }
@@ -307,6 +347,20 @@ public class Booking {
         if (this.reminderSentAt == null) {
             this.reminderSentAt = reminderSentAt;
         }
+    }
+
+    public void reschedule(BookableResource resource, Instant startsAt, Instant endsAt, boolean resetReminder) {
+        this.resource = resource;
+        this.resourceNameSnapshot = resource.getVisibleName();
+        this.startsAt = startsAt;
+        this.endsAt = endsAt;
+        if (resetReminder) {
+            this.reminderSentAt = null;
+        }
+    }
+
+    public void updateDepositStatus(DepositStatus depositStatus) {
+        this.depositStatus = depositStatus;
     }
 }
 

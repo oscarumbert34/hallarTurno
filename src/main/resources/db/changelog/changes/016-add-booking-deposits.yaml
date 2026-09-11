@@ -1,0 +1,38 @@
+databaseChangeLog:
+  - changeSet:
+      id: 016-add-booking-deposits
+      author: turnero
+      comment: Add optional business deposit handling and booking deposit status.
+      changes:
+        - addColumn:
+            tableName: businesses
+            columns:
+              - column:
+                  name: deposit_enabled
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+        - addColumn:
+            tableName: bookings
+            columns:
+              - column:
+                  name: deposit_status
+                  type: varchar(32)
+                  defaultValue: NOT_REQUIRED
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: >-
+              ALTER TABLE bookings
+              ADD CONSTRAINT ck_bookings_deposit_status
+              CHECK (deposit_status IN ('NOT_REQUIRED', 'PENDING', 'PAID'))
+      rollback:
+        - sql:
+            sql: ALTER TABLE bookings DROP CONSTRAINT IF EXISTS ck_bookings_deposit_status
+        - dropColumn:
+            tableName: bookings
+            columnName: deposit_status
+        - dropColumn:
+            tableName: businesses
+            columnName: deposit_enabled

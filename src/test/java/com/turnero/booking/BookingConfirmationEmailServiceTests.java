@@ -60,6 +60,29 @@ class BookingConfirmationEmailServiceTests {
         server.verify();
     }
 
+    @Test
+    void sendRescheduleUsesUpdatedSchedule() {
+        BrevoProperties properties = configuredProperties();
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        BookingConfirmationEmailService service = new BookingConfirmationEmailService(
+                new BrevoTransactionalEmailClient(properties, builder)
+        );
+        Booking booking = booking("ana@example.com");
+
+        server.expect(once(), requestTo("https://api.brevo.test/v3/smtp/email"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().string(containsString("\"subject\":\"Reprogramacion de tu turno en HallarTurno\"")))
+                .andExpect(content().string(containsString("Tu turno fue reprogramado para 08/09/2026 a las 10:00.")))
+                .andExpect(content().string(containsString("Tu turno fue reprogramado")))
+                .andExpect(content().string(containsString("background-color:#2563eb")))
+                .andRespond(withSuccess());
+
+        service.sendReschedule(booking);
+
+        server.verify();
+    }
+
     private Booking booking(String customerEmail) {
         Branch branch = org.mockito.Mockito.mock(Branch.class);
         Business business = org.mockito.Mockito.mock(Business.class);

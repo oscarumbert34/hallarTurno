@@ -79,4 +79,19 @@ class ResourceAvailabilityValidatorTests {
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Resource absences overlap for 2026-09-01");
     }
+
+    @Test
+    void acceptsAllDayAbsenceAndRejectsMixingItWithPartialRanges() {
+        LocalDate date = LocalDate.of(2026, 9, 15);
+        assertThat(validator.validateAbsences(List.of(
+                new ResourceAbsenceRequest(date, true, null, null)
+        ))).singleElement().satisfies(value -> assertThat(value.allDay()).isTrue());
+
+        assertThatThrownBy(() -> validator.validateAbsences(List.of(
+                new ResourceAbsenceRequest(date, true, null, null),
+                new ResourceAbsenceRequest(date, false, LocalTime.of(14, 0), LocalTime.of(17, 0))
+        )))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("All-day resource absence cannot overlap another absence for 2026-09-15");
+    }
 }

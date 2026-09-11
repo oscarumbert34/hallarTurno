@@ -27,6 +27,9 @@ public class ResourceAbsence {
     @Column(name = "absence_date", nullable = false)
     private LocalDate date;
 
+    @Column(name = "all_day", nullable = false)
+    private boolean allDay;
+
     @Column(name = "starts_at", nullable = false)
     private LocalTime startsAt;
 
@@ -36,9 +39,10 @@ public class ResourceAbsence {
     protected ResourceAbsence() {
     }
 
-    ResourceAbsence(BookableResource resource, LocalDate date, LocalTime startsAt, LocalTime endsAt) {
+    ResourceAbsence(BookableResource resource, LocalDate date, boolean allDay, LocalTime startsAt, LocalTime endsAt) {
         this.resource = resource;
         this.date = date;
+        this.allDay = allDay;
         this.startsAt = startsAt;
         this.endsAt = endsAt;
     }
@@ -56,6 +60,10 @@ public class ResourceAbsence {
 
     public LocalTime getStartsAt() {
         return startsAt;
+    }
+
+    public boolean isAllDay() {
+        return allDay;
     }
 
     public LocalTime getEndsAt() {

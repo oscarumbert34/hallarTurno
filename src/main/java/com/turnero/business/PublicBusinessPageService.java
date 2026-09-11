@@ -44,6 +44,7 @@ public class PublicBusinessPageService {
                 business.getShortDescription(),
                 business.getPhone(),
                 business.getContactEmail(),
+                business.isDepositEnabled(),
                 branches
         );
     }

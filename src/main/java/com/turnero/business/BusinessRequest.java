@@ -17,6 +17,15 @@ public record BusinessRequest(
 
         @Email
         @Size(max = 320)
-        String contactEmail
+        String contactEmail,
+
+        Boolean depositEnabled
 ) {
+    public BusinessRequest(String name, String shortDescription, String phone, String contactEmail) {
+        this(name, shortDescription, phone, contactEmail, null);
+    }
+
+    public boolean isDepositEnabled() {
+        return Boolean.TRUE.equals(depositEnabled);
+    }
 }

@@ -11,6 +11,7 @@ public record BusinessResponse(
         String contactEmail,
         String slug,
         BusinessStatus status,
+        boolean depositEnabled,
         UUID ownerId,
         Instant createdAt,
         Instant updatedAt
@@ -25,6 +26,7 @@ public record BusinessResponse(
                 business.getContactEmail(),
                 business.getSlug(),
                 business.getStatus(),
+                business.isDepositEnabled(),
                 business.getOwner().getId(),
                 business.getCreatedAt(),
                 business.getUpdatedAt()

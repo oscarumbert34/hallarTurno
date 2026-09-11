@@ -26,6 +26,7 @@ public class BranchController {
         this.branchService = branchService;
     }
 
+
     @PostMapping("/businesses/{businessId}/branches")
     ResponseEntity<BranchResponse> create(
             @PathVariable UUID businessId,
