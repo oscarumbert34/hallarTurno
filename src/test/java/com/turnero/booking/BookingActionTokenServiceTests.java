@@ -10,12 +10,14 @@ import static org.mockito.Mockito.when;
 import com.turnero.branch.Branch;
 import com.turnero.business.Business;
 import com.turnero.common.ApiException;
+import com.turnero.user.User;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 
 class BookingActionTokenServiceTests {
 
@@ -24,9 +26,11 @@ class BookingActionTokenServiceTests {
     private final BookingActionTokenRepository repository = mock(BookingActionTokenRepository.class);
     @SuppressWarnings("unchecked")
     private final ObjectProvider<BookingActionTokenRepository> repositoryProvider = mock(ObjectProvider.class);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final BookingActionTokenService service = new BookingActionTokenService(
             repositoryProvider,
-            Clock.fixed(NOW, ZoneOffset.UTC)
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            eventPublisher
     );
 
     BookingActionTokenServiceTests() {
@@ -59,6 +63,18 @@ class BookingActionTokenServiceTests {
     }
 
     @Test
+    void cancellationPublishesAnAppointmentCancelledEvent() {
+        Booking booking = booking(BookingStatus.PENDING_CONFIRMATION);
+        BookingActionToken token = new BookingActionToken(booking, "hash", NOW.plusSeconds(3600));
+        when(repository.findByTokenHashForUpdate(anyString())).thenReturn(Optional.of(token));
+
+        service.cancel(RAW_TOKEN);
+
+        verify(booking).cancel(null, NOW);
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.any(AppointmentCancelledEvent.class));
+    }
+
+    @Test
     void expiredTokenCanBeDisplayedButCannotBeUsed() {
         BookingActionToken token = new BookingActionToken(
                 booking(BookingStatus.PENDING_CONFIRMATION), "hash", NOW);
@@ -75,13 +91,20 @@ class BookingActionTokenServiceTests {
         Booking booking = mock(Booking.class);
         Branch branch = mock(Branch.class);
         Business business = mock(Business.class);
+        User owner = mock(User.class);
         when(booking.getBranch()).thenReturn(branch);
         when(booking.getBusiness()).thenReturn(business);
+        when(booking.getId()).thenReturn(java.util.UUID.randomUUID());
         when(booking.getStartsAt()).thenReturn(Instant.parse("2026-09-15T19:30:00Z"));
         when(booking.getStatus()).thenReturn(status, BookingStatus.CONFIRMED);
         when(booking.getServiceNameSnapshot()).thenReturn("Podologia");
+        when(booking.getResourceNameSnapshot()).thenReturn("Consultorio 1");
+        when(booking.getCustomerNameSnapshot()).thenReturn("Ana Pérez");
         when(branch.getZoneId()).thenReturn("America/Argentina/Buenos_Aires");
+        when(branch.getName()).thenReturn("Centro");
         when(business.getName()).thenReturn("Centro Ejemplo");
+        when(business.getContactEmail()).thenReturn("turnos@centro.test");
+        when(business.getOwner()).thenReturn(owner);
         return booking;
     }
 }

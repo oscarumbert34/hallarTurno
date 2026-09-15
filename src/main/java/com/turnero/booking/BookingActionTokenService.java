@@ -11,6 +11,7 @@ import java.util.Base64;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -19,10 +20,16 @@ public class BookingActionTokenService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private final ObjectProvider<BookingActionTokenRepository> repositoryProvider;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public BookingActionTokenService(ObjectProvider<BookingActionTokenRepository> repositoryProvider, Clock clock) {
+    public BookingActionTokenService(
+            ObjectProvider<BookingActionTokenRepository> repositoryProvider,
+            Clock clock,
+            ApplicationEventPublisher eventPublisher
+    ) {
         this.repositoryProvider = repositoryProvider;
         this.clock = clock;
+        this.eventPublisher = eventPublisher;
     }
 
     String issueFor(Booking booking) {
@@ -72,6 +79,7 @@ public class BookingActionTokenService {
         }
         booking.cancel(null, clock.instant());
         token.markUsed(clock.instant());
+        eventPublisher.publishEvent(AppointmentCancelledEvent.from(booking));
         return PublicBookingActionResponse.from(token, false);
     }
 

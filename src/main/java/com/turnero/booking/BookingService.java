@@ -41,6 +41,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -73,6 +74,7 @@ public class BookingService {
     private final BookingActionTokenService bookingActionTokenService;
     private final Clock clock;
     private final MeterRegistry meterRegistry;
+    private final ApplicationEventPublisher eventPublisher;
 
     public BookingService(
             BookingRepository bookingRepository,
@@ -88,7 +90,8 @@ public class BookingService {
             BookingConfirmationEmailService bookingConfirmationEmailService,
             BookingActionTokenService bookingActionTokenService,
             Clock clock,
-            MeterRegistry meterRegistry
+            MeterRegistry meterRegistry,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
@@ -104,6 +107,7 @@ public class BookingService {
         this.bookingActionTokenService = bookingActionTokenService;
         this.clock = clock;
         this.meterRegistry = meterRegistry;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -261,7 +265,13 @@ public class BookingService {
         User cancelledBy = userRepository.findById(currentUser.id())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Authenticated user was not found"));
         assertCanCancel(booking, currentUser);
+        boolean cancelledByCustomer = booking.getStatus() != BookingStatus.CANCELLED
+                && booking.getCustomer() != null
+                && booking.getCustomer().getId().equals(currentUser.id());
         booking.cancel(cancelledBy, Instant.now(clock));
+        if (cancelledByCustomer) {
+            eventPublisher.publishEvent(AppointmentCancelledEvent.from(booking));
+        }
         return BookingResponse.from(booking);
     }
 

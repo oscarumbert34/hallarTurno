@@ -443,6 +443,8 @@ PUT /api/v1/bookings/{bookingId}/reschedule
 
 La busqueda de contacto por telefono es protegida y solo la puede usar el owner del negocio o `ADMIN`. Si existe, responde el contacto; si no, devuelve `404 Customer contact not found`. El frontend puede usar ese `404` para pedir email al cliente final antes de crear el turno.
 
+Cuando el cliente cancela un turno, ya sea autenticado o mediante el enlace público de acción, se publica un `AppointmentCancelledEvent` y después del commit se envía inmediatamente un email al negocio por Brevo. Se prioriza `contactEmail` y, si no está informado, se usa el email del propietario. Las cancelaciones del owner o de un administrador no generan este aviso y un fallo del proveedor de email no revierte la cancelación.
+
 ### Excepciones de agenda
 
 Las ausencias de recursos admiten tanto rangos parciales como dias completos. Para un dia completo se envia `{"date":"2026-09-15","allDay":true}`; para un rango parcial se puede enviar `{"date":"2026-09-15","startTime":"14:00","endTime":"17:00"}`. Los nombres anteriores `startsAt` y `endsAt` siguen siendo aceptados. No se permiten rangos invertidos, solapamientos ni combinar una ausencia de dia completo con otras ausencias para la misma fecha.
