@@ -8,9 +8,16 @@ public record PublicBusinessDetailResponse(
         String name,
         String slug,
         String shortDescription,
+        String publicDescription,
+        String aboutUs,
+        String whatsapp,
+        String instagram,
+        String logoUrl,
+        String coverImageUrl,
         String phone,
         String email,
         boolean depositEnabled,
-        List<PublicBusinessBranchResponse> branches
+        List<PublicBusinessBranchResponse> branches,
+        List<PublicBranchServiceResponse> services
 ) {
 }

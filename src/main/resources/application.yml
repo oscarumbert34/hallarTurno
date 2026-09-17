@@ -26,6 +26,10 @@ spring:
       idle-timeout: ${DB_POOL_IDLE_TIMEOUT:600000}
       max-lifetime: ${DB_POOL_MAX_LIFETIME:1800000}
       connection-init-sql: SET TIME ZONE 'UTC'
+  servlet:
+    multipart:
+      max-file-size: 3MB
+      max-request-size: 4MB
 
 server:
   port: ${PORT:8080}
@@ -81,6 +85,15 @@ brevo:
 availability:
   default-zone-id: ${AVAILABILITY_DEFAULT_ZONE_ID:America/Argentina/Buenos_Aires}
   slot-granularity-minutes: ${AVAILABILITY_SLOT_GRANULARITY_MINUTES:15}
+
+storage:
+  bucket: ${STORAGE_BUCKET:}
+  access-key: ${STORAGE_ACCESS_KEY:}
+  secret-key: ${STORAGE_SECRET_KEY:}
+  region: ${STORAGE_REGION:auto}
+  endpoint: ${STORAGE_ENDPOINT:}
+  url-style: ${STORAGE_URL_STYLE:virtual}
+  signed-url-duration: ${STORAGE_SIGNED_URL_DURATION:PT1H}
 
 app:
   frontend:

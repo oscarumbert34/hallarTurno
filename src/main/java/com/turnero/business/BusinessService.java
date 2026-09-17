@@ -48,6 +48,11 @@ public class BusinessService {
                 owner,
                 request.name().trim(),
                 this.blankToNull(request.shortDescription()),
+                this.blankToNull(request.aboutUs()),
+                this.blankToNull(request.whatsapp()),
+                this.blankToNull(request.instagram()),
+                null,
+                null,
                 this.blankToNull(request.phone()),
                 this.blankToNull(request.contactEmail()),
                 slug,
@@ -88,6 +93,11 @@ public class BusinessService {
         business.updateDetails(
                 request.name().trim(),
                 this.blankToNull(request.shortDescription()),
+                this.blankToNull(request.aboutUs()),
+                this.blankToNull(request.whatsapp()),
+                this.blankToNull(request.instagram()),
+                business.getLogoImageKey(),
+                business.getCoverImageKey(),
                 this.blankToNull(request.phone()),
                 this.blankToNull(request.contactEmail())
         );

@@ -1,5 +1,6 @@
 package com.turnero.business;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -9,8 +10,18 @@ public record BusinessRequest(
         @Size(max = 160)
         String name,
 
+        @JsonAlias("publicDescription")
         @Size(max = 500)
         String shortDescription,
+
+        @Size(max = 5000)
+        String aboutUs,
+
+        @Size(max = 40)
+        String whatsapp,
+
+        @Size(max = 255)
+        String instagram,
 
         @Size(max = 40)
         String phone,
@@ -22,7 +33,7 @@ public record BusinessRequest(
         Boolean depositEnabled
 ) {
     public BusinessRequest(String name, String shortDescription, String phone, String contactEmail) {
-        this(name, shortDescription, phone, contactEmail, null);
+        this(name, shortDescription, null, null, null, phone, contactEmail, null);
     }
 
     public boolean isDepositEnabled() {

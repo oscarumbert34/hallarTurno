@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -63,6 +64,20 @@ public class GlobalExceptionHandler {
 
         log.warn("constraint validation failed path={} violations={}", request.getRequestURI(), details.size());
         return buildResponse(HttpStatus.BAD_REQUEST, "Validation failed", request, details);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<ApiError> handleMaxUploadSizeExceeded(
+            MaxUploadSizeExceededException exception,
+            HttpServletRequest request
+    ) {
+        log.warn("multipart upload too large path={}", request.getRequestURI());
+        return buildResponse(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "Image exceeds the maximum size of 3 MB",
+                request,
+                List.of()
+        );
     }
 
     @ExceptionHandler(Exception.class)

@@ -42,6 +42,21 @@ public class Business {
     @Column(name = "short_description", length = 500)
     private String shortDescription;
 
+    @Column(name = "about_us", length = 5000)
+    private String aboutUs;
+
+    @Column(length = 40)
+    private String whatsapp;
+
+    @Column(length = 255)
+    private String instagram;
+
+    @Column(name = "logo_image_key", length = 512)
+    private String logoImageKey;
+
+    @Column(name = "cover_image_key", length = 512)
+    private String coverImageKey;
+
     @Column(length = 40)
     private String phone;
 
@@ -79,6 +94,11 @@ public class Business {
             User owner,
             String name,
             String shortDescription,
+            String aboutUs,
+            String whatsapp,
+            String instagram,
+            String logoImageKey,
+            String coverImageKey,
             String phone,
             String contactEmail,
             String slug,
@@ -88,6 +108,11 @@ public class Business {
         this.owner = owner;
         this.name = name;
         this.shortDescription = shortDescription;
+        this.aboutUs = aboutUs;
+        this.whatsapp = whatsapp;
+        this.instagram = instagram;
+        this.logoImageKey = logoImageKey;
+        this.coverImageKey = coverImageKey;
         this.phone = phone;
         this.contactEmail = contactEmail;
         this.slug = slug;
@@ -104,7 +129,7 @@ public class Business {
             String slug,
             BusinessStatus status
     ) {
-        return create(owner, name, shortDescription, phone, contactEmail, slug, status, false);
+        return create(owner, name, shortDescription, null, null, null, null, null, phone, contactEmail, slug, status, false);
     }
 
     public static Business create(
@@ -117,7 +142,26 @@ public class Business {
             BusinessStatus status,
             boolean depositEnabled
     ) {
-        return new Business(owner, name, shortDescription, phone, contactEmail, slug, status, depositEnabled);
+        return create(owner, name, shortDescription, null, null, null, null, null, phone, contactEmail, slug, status, depositEnabled);
+    }
+
+    public static Business create(
+            User owner,
+            String name,
+            String shortDescription,
+            String aboutUs,
+            String whatsapp,
+            String instagram,
+            String logoImageKey,
+            String coverImageKey,
+            String phone,
+            String contactEmail,
+            String slug,
+            BusinessStatus status,
+            boolean depositEnabled
+    ) {
+        return new Business(owner, name, shortDescription, aboutUs, whatsapp, instagram, logoImageKey,
+                coverImageKey, phone, contactEmail, slug, status, depositEnabled);
     }
 
     @PrePersist
@@ -138,6 +182,18 @@ public class Business {
     public String getShortDescription() {
         return shortDescription;
     }
+
+    public String getPublicDescription() { return shortDescription; }
+
+    public String getAboutUs() { return aboutUs; }
+
+    public String getWhatsapp() { return whatsapp; }
+
+    public String getInstagram() { return instagram; }
+
+    public String getLogoImageKey() { return logoImageKey; }
+
+    public String getCoverImageKey() { return coverImageKey; }
 
     public String getPhone() {
         return phone;
@@ -171,14 +227,36 @@ public class Business {
         return updatedAt;
     }
 
-    public void updateDetails(String name, String shortDescription, String phone, String contactEmail) {
+    public void updateDetails(String name, String shortDescription, String aboutUs, String whatsapp,
+                              String instagram, String logoImageKey, String coverImageKey,
+                              String phone, String contactEmail) {
         this.name = name;
         this.shortDescription = shortDescription;
+        this.aboutUs = aboutUs;
+        this.whatsapp = whatsapp;
+        this.instagram = instagram;
+        this.logoImageKey = logoImageKey;
+        this.coverImageKey = coverImageKey;
         this.phone = phone;
         this.contactEmail = contactEmail;
     }
 
     public void updateDepositEnabled(boolean depositEnabled) {
         this.depositEnabled = depositEnabled;
+    }
+
+    public void updatePublicProfile(String publicDescription, String aboutUs, String whatsapp, String instagram) {
+        this.shortDescription = publicDescription;
+        this.aboutUs = aboutUs;
+        this.whatsapp = whatsapp;
+        this.instagram = instagram;
+    }
+
+    public void updateLogoImageKey(String logoImageKey) {
+        this.logoImageKey = logoImageKey;
+    }
+
+    public void updateCoverImageKey(String coverImageKey) {
+        this.coverImageKey = coverImageKey;
     }
 }

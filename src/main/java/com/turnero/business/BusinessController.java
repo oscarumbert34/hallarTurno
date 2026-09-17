@@ -12,6 +12,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.MediaType;
 
 import java.net.URI;
 import java.util.List;
@@ -22,9 +25,14 @@ import java.util.UUID;
 public class BusinessController {
 
     private final BusinessService businessService;
+    private final BusinessPublicProfileService publicProfileService;
 
-    public BusinessController(final BusinessService businessService) {
+    public BusinessController(
+            final BusinessService businessService,
+            final BusinessPublicProfileService publicProfileService
+    ) {
         this.businessService = businessService;
+        this.publicProfileService = publicProfileService;
     }
 
     @PostMapping
@@ -73,6 +81,33 @@ public class BusinessController {
             @AuthenticationPrincipal final AuthenticatedUser currentUser
     ) {
         return this.businessService.updateConfiguration(id, request, currentUser);
+    }
+
+    @PutMapping("/{id}/public-profile")
+    BusinessPublicProfileResponse updatePublicProfile(
+            @PathVariable final UUID id,
+            @Valid @RequestBody final BusinessPublicProfileRequest request,
+            @AuthenticationPrincipal final AuthenticatedUser currentUser
+    ) {
+        return this.publicProfileService.update(id, request, currentUser);
+    }
+
+    @PostMapping(value = "/{id}/public-profile/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    BusinessImageUploadResponse uploadLogo(
+            @PathVariable final UUID id,
+            @RequestPart("file") final MultipartFile file,
+            @AuthenticationPrincipal final AuthenticatedUser currentUser
+    ) {
+        return this.publicProfileService.uploadLogo(id, file, currentUser);
+    }
+
+    @PostMapping(value = "/{id}/public-profile/cover", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    BusinessImageUploadResponse uploadCover(
+            @PathVariable final UUID id,
+            @RequestPart("file") final MultipartFile file,
+            @AuthenticationPrincipal final AuthenticatedUser currentUser
+    ) {
+        return this.publicProfileService.uploadCover(id, file, currentUser);
     }
 
     @DeleteMapping("/{id}")

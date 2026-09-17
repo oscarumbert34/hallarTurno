@@ -3,6 +3,7 @@ package com.turnero.business;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -15,6 +16,7 @@ import com.turnero.user.User;
 import com.turnero.user.UserRepository;
 import com.turnero.user.UserRole;
 import com.turnero.user.UserStatus;
+import com.turnero.storage.ObjectStorageService;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +26,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.mock.web.MockMultipartFile;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -51,6 +57,9 @@ class BusinessControllerIntegrationTests {
     @Autowired
     private JwtService jwtService;
 
+    @MockBean
+    private ObjectStorageService storageService;
+
     @DynamicPropertySource
     static void configureDatasource(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -68,13 +77,21 @@ class BusinessControllerIntegrationTests {
                         .content("""
                                 {
                                   "name": "Cafe Central",
-                                  "shortDescription": "Turnos para merienda",
+                                  "publicDescription": "Turnos para merienda",
+                                  "aboutUs": "Una cafetería de barrio desde 1998",
+                                  "whatsapp": "+54 9 11 5555-5555",
+                                  "instagram": "@cafecentral",
                                   "phone": "+54 11 5555-5555",
                                   "contactEmail": "hola@cafecentral.com"
                                 }
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Cafe Central"))
+                .andExpect(jsonPath("$.shortDescription").value("Turnos para merienda"))
+                .andExpect(jsonPath("$.publicDescription").value("Turnos para merienda"))
+                .andExpect(jsonPath("$.aboutUs").value("Una cafetería de barrio desde 1998"))
+                .andExpect(jsonPath("$.whatsapp").value("+54 9 11 5555-5555"))
+                .andExpect(jsonPath("$.instagram").value("@cafecentral"))
                 .andExpect(jsonPath("$.slug").value("cafe-central"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.depositEnabled").value(false))
@@ -166,6 +183,61 @@ class BusinessControllerIntegrationTests {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Business not found"));
+    }
+
+    @Test
+    void ownerCanConfigurePublicProfileUploadImagesAndReadSignedPublicUrls() throws Exception {
+        String token = registerAndGetToken("public-profile@example.com", "BUSINESS");
+        String businessId = createBusiness(token, "Barberia Norte");
+        when(storageService.signedGetUrl(anyString()))
+                .thenAnswer(invocation -> "https://signed.example/" + invocation.getArgument(0, String.class));
+
+        mockMvc.perform(put("/api/v1/businesses/" + businessId + "/public-profile")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "publicDescription": "Cortes, barba y cuidado personal",
+                                  "aboutUs": "Atencion personalizada",
+                                  "whatsapp": "541112345678",
+                                  "instagram": "barberianorte"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicDescription").value("Cortes, barba y cuidado personal"))
+                .andExpect(jsonPath("$.instagram").value("barberianorte"));
+
+        MockMultipartFile logo = new MockMultipartFile(
+                "file", "logo.png", "image/png",
+                new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 1});
+        mockMvc.perform(multipart("/api/v1/businesses/" + businessId + "/public-profile/logo")
+                        .file(logo)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageKey").isNotEmpty())
+                .andExpect(jsonPath("$.imageUrl").value(org.hamcrest.Matchers.startsWith("https://signed.example/")))
+                .andExpect(jsonPath("$.contentType").value("image/png"));
+
+        MockMultipartFile cover = new MockMultipartFile(
+                "file", "cover.webp", "image/webp",
+                new byte[]{'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'E', 'B', 'P', 1});
+        mockMvc.perform(multipart("/api/v1/businesses/" + businessId + "/public-profile/cover")
+                        .file(cover)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageKey").isNotEmpty())
+                .andExpect(jsonPath("$.contentType").value("image/webp"));
+
+        mockMvc.perform(get("/api/v1/public/businesses/barberia-norte"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.publicDescription").value("Cortes, barba y cuidado personal"))
+                .andExpect(jsonPath("$.aboutUs").value("Atencion personalizada"))
+                .andExpect(jsonPath("$.whatsapp").value("541112345678"))
+                .andExpect(jsonPath("$.instagram").value("barberianorte"))
+                .andExpect(jsonPath("$.logoUrl").value(org.hamcrest.Matchers.startsWith("https://signed.example/")))
+                .andExpect(jsonPath("$.coverImageUrl").value(org.hamcrest.Matchers.startsWith("https://signed.example/")))
+                .andExpect(jsonPath("$.branches").isArray())
+                .andExpect(jsonPath("$.services").isArray());
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.turnero.booking.BookingService;
 import com.turnero.branch.BranchService;
 import com.turnero.branch.BranchScheduleExceptionService;
 import com.turnero.business.BusinessService;
+import com.turnero.business.BusinessPublicProfileService;
 import com.turnero.business.PublicBusinessPageService;
 import com.turnero.customer.CustomerContactService;
 import com.turnero.employee.BookableResourceService;
@@ -27,6 +28,9 @@ class TurneroApplicationTests {
 
     @MockBean
     private BusinessService businessService;
+
+    @MockBean
+    private BusinessPublicProfileService businessPublicProfileService;
 
     @MockBean
     private PublicBusinessPageService publicBusinessPageService;

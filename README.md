@@ -538,6 +538,30 @@ El esquema debe cambiar solo mediante Liquibase. JPA/Hibernate usa `ddl-auto=val
 - Timezone del backend y sesiones de base configurada en UTC.
 - Hibernate no debe crear ni actualizar tablas automaticamente.
 
+## Imagenes del perfil publico
+
+Los logos y portadas se almacenan en un bucket privado compatible con S3. En Railway, configurar en el servicio backend:
+
+```text
+STORAGE_BUCKET=<valor BUCKET del Railway Bucket>
+STORAGE_ACCESS_KEY=<valor ACCESS_KEY_ID>
+STORAGE_SECRET_KEY=<valor SECRET_ACCESS_KEY>
+STORAGE_REGION=auto
+STORAGE_ENDPOINT=https://t3.storageapi.dev
+STORAGE_URL_STYLE=virtual
+STORAGE_SIGNED_URL_DURATION=PT1H
+```
+
+`STORAGE_BUCKET` debe contener el nombre S3 real expuesto como `BUCKET`, no `RAILWAY_BUCKET_NAME`. Las credenciales nunca deben enviarse al frontend.
+
+Endpoints protegidos para el owner o `ADMIN`:
+
+- `PUT /api/v1/businesses/{businessId}/public-profile`
+- `POST /api/v1/businesses/{businessId}/public-profile/logo` (`multipart/form-data`, campo `file`, maximo 1 MB)
+- `POST /api/v1/businesses/{businessId}/public-profile/cover` (`multipart/form-data`, campo `file`, maximo 3 MB)
+
+Los formatos admitidos son JPEG, PNG y WEBP. En base de datos se conserva solamente la key del objeto. `GET /api/v1/public/businesses/{slug}` genera URLs de lectura firmadas y temporales e incluye sucursales con sus horarios y los servicios activos.
+
 ## Tests
 
 Ejecutar:

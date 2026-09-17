@@ -1,0 +1,40 @@
+databaseChangeLog:
+  - changeSet:
+      id: 019-add-business-public-profile
+      author: turnero
+      comment: Add optional fields used by the public business profile.
+      changes:
+        - addColumn:
+            tableName: businesses
+            columns:
+              - column:
+                  name: about_us
+                  type: varchar(5000)
+              - column:
+                  name: whatsapp
+                  type: varchar(40)
+              - column:
+                  name: instagram
+                  type: varchar(255)
+              - column:
+                  name: logo_image_key
+                  type: varchar(512)
+              - column:
+                  name: cover_image_key
+                  type: varchar(512)
+      rollback:
+        - dropColumn:
+            tableName: businesses
+            columnName: cover_image_key
+        - dropColumn:
+            tableName: businesses
+            columnName: logo_image_key
+        - dropColumn:
+            tableName: businesses
+            columnName: instagram
+        - dropColumn:
+            tableName: businesses
+            columnName: whatsapp
+        - dropColumn:
+            tableName: businesses
+            columnName: about_us

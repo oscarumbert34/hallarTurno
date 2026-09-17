@@ -6,6 +6,7 @@ import com.turnero.branch.BranchStatus;
 import com.turnero.common.ApiException;
 import com.turnero.service.ServiceOfferingRepository;
 import com.turnero.service.ServiceOfferingStatus;
+import com.turnero.storage.ObjectStorageService;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -18,15 +19,18 @@ public class PublicBusinessPageService {
     private final BusinessRepository businessRepository;
     private final BranchRepository branchRepository;
     private final ServiceOfferingRepository serviceOfferingRepository;
+    private final ObjectStorageService storageService;
 
     public PublicBusinessPageService(
             final BusinessRepository businessRepository,
             final BranchRepository branchRepository,
-            final ServiceOfferingRepository serviceOfferingRepository
+            final ServiceOfferingRepository serviceOfferingRepository,
+            final ObjectStorageService storageService
     ) {
         this.businessRepository = businessRepository;
         this.branchRepository = branchRepository;
         this.serviceOfferingRepository = serviceOfferingRepository;
+        this.storageService = storageService;
     }
 
     @Transactional(readOnly = true)
@@ -37,15 +41,27 @@ public class PublicBusinessPageService {
                 .stream()
                 .map(PublicBusinessBranchResponse::from)
                 .toList();
+        final List<PublicBranchServiceResponse> services = this.serviceOfferingRepository
+                .findByBusinessIdAndStatusOrderByNameAsc(business.getId(), ServiceOfferingStatus.ACTIVE)
+                .stream()
+                .map(PublicBranchServiceResponse::from)
+                .toList();
         return new PublicBusinessDetailResponse(
                 business.getId(),
                 business.getName(),
                 business.getSlug(),
                 business.getShortDescription(),
+                business.getPublicDescription(),
+                business.getAboutUs(),
+                business.getWhatsapp(),
+                business.getInstagram(),
+                this.storageService.signedGetUrl(business.getLogoImageKey()),
+                this.storageService.signedGetUrl(business.getCoverImageKey()),
                 business.getPhone(),
                 business.getContactEmail(),
                 business.isDepositEnabled(),
-                branches
+                branches,
+                services
         );
     }
 

@@ -16,6 +16,7 @@ public interface BranchRepository extends JpaRepository<Branch, UUID> {
     @EntityGraph(attributePaths = {"business", "business.owner", "openingIntervals"})
     List<Branch> findDistinctByBusinessIdOrderByNameAsc(UUID businessId);
 
+    @EntityGraph(attributePaths = {"business", "openingIntervals"})
     List<Branch> findByBusinessIdAndStatusOrderByNameAsc(UUID businessId, BranchStatus status);
 
     @EntityGraph(attributePaths = {"business", "openingIntervals"})
