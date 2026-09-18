@@ -75,6 +75,10 @@ booking:
     zone-id: ${BOOKING_REMINDERS_ZONE_ID:America/Argentina/Buenos_Aires}
     target-days-offset: ${BOOKING_REMINDERS_TARGET_DAYS_OFFSET:1}
     minimum-hours-before-start: ${BOOKING_REMINDERS_MINIMUM_HOURS_BEFORE_START:12}
+  business-agenda:
+    enabled: ${BUSINESS_AGENDA_ENABLED:true}
+    cron: "${BUSINESS_AGENDA_CRON:0 0 18 * * *}"
+    zone-id: ${BUSINESS_AGENDA_ZONE_ID:America/Argentina/Buenos_Aires}
 
 brevo:
   api-key: ${BREVO_API_KEY:}

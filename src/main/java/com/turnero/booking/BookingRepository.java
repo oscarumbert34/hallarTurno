@@ -170,4 +170,25 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             @Param("startsAtFrom") Instant startsAtFrom,
             @Param("startsAtTo") Instant startsAtTo
     );
+
+    @EntityGraph(attributePaths = {
+            "business",
+            "business.owner",
+            "branch",
+            "serviceOffering",
+            "resource"
+    })
+    @Query("""
+            select booking
+            from Booking booking
+            where booking.status in :statuses
+              and booking.startsAt >= :startsAtFrom
+              and booking.startsAt < :startsAtTo
+            order by booking.business.id asc, booking.startsAt asc, booking.id asc
+            """)
+    List<Booking> findBusinessAgendaCandidates(
+            @Param("statuses") Collection<BookingStatus> statuses,
+            @Param("startsAtFrom") Instant startsAtFrom,
+            @Param("startsAtTo") Instant startsAtTo
+    );
 }

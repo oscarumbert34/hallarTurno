@@ -143,4 +143,5 @@ class ActuatorHealthSecurityTests {
                 .andExpect(jsonPath("$.triggered").value(true));
         verify(this.bookingReminderService).sendDueReminders();
     }
+
 }

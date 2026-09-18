@@ -62,6 +62,14 @@ Variables Brevo:
 | `BREVO_FROM_NAME` | Nombre remitente para emails transaccionales. | `HallarTurno` |
 | `BREVO_BASE_URL` | URL base de la API de Brevo. | `https://api.brevo.com` |
 
+Variables del resumen diario para negocios:
+
+| Variable | Uso | Default |
+| --- | --- | --- |
+| `BUSINESS_AGENDA_ENABLED` | Habilita el email diario con los turnos activos del dia siguiente. | `true` |
+| `BUSINESS_AGENDA_CRON` | Cron del resumen diario. | `0 0 18 * * *` |
+| `BUSINESS_AGENDA_ZONE_ID` | Zona horaria usada para calcular el dia siguiente y ejecutar el job. | `America/Argentina/Buenos_Aires` |
+
 Variables de disponibilidad:
 
 | Variable | Uso | Default |
