@@ -224,7 +224,7 @@ Endpoint de testing disponible fuera del perfil `prod`:
 - `GET /actuator/info`
 - `GET /actuator/metrics`
 
-La respuesta de login incluye `businessId` cuando el usuario autenticado es propietario de al menos un negocio; si no tiene negocio asociado, se devuelve `null`.
+La respuesta de login incluye `businessId` y `businessSlug` cuando el usuario autenticado es propietario de al menos un negocio; si no tiene negocio asociado, ambos se devuelven como `null`.
 
 El resto de los endpoints requiere `Authorization: Bearer <token>`.
 

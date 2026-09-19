@@ -8,7 +8,6 @@ import com.turnero.user.User;
 import com.turnero.user.UserRepository;
 import com.turnero.user.UserRole;
 import com.turnero.user.UserStatus;
-import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -52,10 +51,12 @@ public class AuthService {
         User savedUser = userRepository.saveAndFlush(user);
         String accessToken = jwtService.generateAccessToken(savedUser);
         sendWelcomeEmailAfterCommit(savedUser);
+        Business primaryBusiness = findPrimaryBusiness(savedUser);
 
         return AuthResponse.bearer(
                 UserResponse.from(savedUser),
-                findPrimaryBusinessId(savedUser),
+                primaryBusiness == null ? null : primaryBusiness.getId(),
+                primaryBusiness == null ? null : primaryBusiness.getSlug(),
                 accessToken,
                 jwtService.accessTokenExpiresInSeconds()
         );
@@ -73,21 +74,22 @@ public class AuthService {
         }
 
         String accessToken = jwtService.generateAccessToken(user);
+        Business primaryBusiness = findPrimaryBusiness(user);
         return AuthResponse.bearer(
                 UserResponse.from(user),
-                findPrimaryBusinessId(user),
+                primaryBusiness == null ? null : primaryBusiness.getId(),
+                primaryBusiness == null ? null : primaryBusiness.getSlug(),
                 accessToken,
                 jwtService.accessTokenExpiresInSeconds()
         );
     }
 
-    private UUID findPrimaryBusinessId(User user) {
+    private Business findPrimaryBusiness(User user) {
         if (user.getId() == null) {
             return null;
         }
         return businessRepository.findByOwnerIdOrderByCreatedAtDesc(user.getId()).stream()
                 .findFirst()
-                .map(Business::getId)
                 .orElse(null);
     }
 

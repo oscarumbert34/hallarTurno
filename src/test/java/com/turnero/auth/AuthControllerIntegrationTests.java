@@ -104,7 +104,7 @@ class AuthControllerIntegrationTests {
     }
 
     @Test
-    void loginReturnsBusinessIdWhenUserOwnsBusiness() throws Exception {
+    void loginReturnsBusinessIdAndSlugWhenUserOwnsBusiness() throws Exception {
         String registerResponse = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -133,6 +133,7 @@ class AuthControllerIntegrationTests {
                 .getResponse()
                 .getContentAsString();
         String businessId = objectMapper.readTree(businessResponse).get("id").asText();
+        String businessSlug = objectMapper.readTree(businessResponse).get("slug").asText();
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -143,7 +144,8 @@ class AuthControllerIntegrationTests {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.businessId").value(businessId));
+                .andExpect(jsonPath("$.businessId").value(businessId))
+                .andExpect(jsonPath("$.businessSlug").value(businessSlug));
     }
 
     @Test
