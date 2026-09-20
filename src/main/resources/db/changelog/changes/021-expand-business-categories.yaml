@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 021-expand-business-categories
+      author: turnero
+      comment: Allow the complete set of supported business categories.
+      changes:
+        - sql:
+            sql: ALTER TABLE businesses DROP CONSTRAINT chk_businesses_category
+        - sql:
+            sql: ALTER TABLE businesses ADD CONSTRAINT chk_businesses_category CHECK (category IN ('BARBERSHOP', 'HAIRDRESSER', 'BEAUTY', 'WELLNESS', 'HEALTH', 'FITNESS', 'PET_SERVICES', 'EDUCATION', 'PROFESSIONAL_SERVICES', 'OTHERS'))
