@@ -10,6 +10,8 @@ public record BusinessRequest(
         @Size(max = 160)
         String name,
 
+        BusinessCategory category,
+
         @JsonAlias("publicDescription")
         @Size(max = 500)
         String shortDescription,
@@ -33,10 +35,14 @@ public record BusinessRequest(
         Boolean depositEnabled
 ) {
     public BusinessRequest(String name, String shortDescription, String phone, String contactEmail) {
-        this(name, shortDescription, null, null, null, phone, contactEmail, null);
+        this(name, null, shortDescription, null, null, null, phone, contactEmail, null);
     }
 
     public boolean isDepositEnabled() {
         return Boolean.TRUE.equals(depositEnabled);
+    }
+
+    public BusinessCategory resolvedCategory() {
+        return category == null ? BusinessCategory.OTHERS : category;
     }
 }

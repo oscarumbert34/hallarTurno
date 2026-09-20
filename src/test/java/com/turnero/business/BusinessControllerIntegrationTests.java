@@ -77,6 +77,7 @@ class BusinessControllerIntegrationTests {
                         .content("""
                                 {
                                   "name": "Cafe Central",
+                                  "category": "BEAUTY",
                                   "publicDescription": "Turnos para merienda",
                                   "aboutUs": "Una cafetería de barrio desde 1998",
                                   "whatsapp": "+54 9 11 5555-5555",
@@ -87,6 +88,7 @@ class BusinessControllerIntegrationTests {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Cafe Central"))
+                .andExpect(jsonPath("$.category").value("BEAUTY"))
                 .andExpect(jsonPath("$.shortDescription").value("Turnos para merienda"))
                 .andExpect(jsonPath("$.publicDescription").value("Turnos para merienda"))
                 .andExpect(jsonPath("$.aboutUs").value("Una cafetería de barrio desde 1998"))

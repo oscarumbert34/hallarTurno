@@ -226,6 +226,8 @@ Endpoint de testing disponible fuera del perfil `prod`:
 
 La respuesta de login incluye `businessId` y `businessSlug` cuando el usuario autenticado es propietario de al menos un negocio; si no tiene negocio asociado, ambos se devuelven como `null`.
 
+Al crear o actualizar un negocio se puede enviar `category`. Los valores admitidos son `BARBERSHOP`, `HAIRDRESSER`, `BEAUTY`, `HEALTH`, `FITNESS`, `PROFESSIONAL_SERVICES` y `OTHERS`. Si se omite durante la creacion se usa `OTHERS`; si se omite durante una actualizacion se conserva la categoria actual. Los negocios anteriores a esta funcionalidad se migran a `OTHERS`.
+
 El resto de los endpoints requiere `Authorization: Bearer <token>`.
 
 Matriz de permisos:

@@ -5,6 +5,7 @@ import java.util.UUID;
 public record PublicBusinessResponse(
         UUID id,
         String name,
+        BusinessCategory category,
         String shortDescription,
         String publicDescription,
         String aboutUs,
@@ -21,6 +22,7 @@ public record PublicBusinessResponse(
         return new PublicBusinessResponse(
                 business.getId(),
                 business.getName(),
+                business.getCategory(),
                 business.getShortDescription(),
                 business.getPublicDescription(),
                 business.getAboutUs(),

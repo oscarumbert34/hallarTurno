@@ -47,6 +47,7 @@ public class BusinessService {
         final Business business = Business.create(
                 owner,
                 request.name().trim(),
+                request.resolvedCategory(),
                 this.blankToNull(request.shortDescription()),
                 this.blankToNull(request.aboutUs()),
                 this.blankToNull(request.whatsapp()),
@@ -92,6 +93,7 @@ public class BusinessService {
         this.ownershipGuard.requireOwnerOrAdmin(business, currentUser, "Business can only be managed by its owner or an admin");
         business.updateDetails(
                 request.name().trim(),
+                request.category() == null ? business.getCategory() : request.category(),
                 this.blankToNull(request.shortDescription()),
                 this.blankToNull(request.aboutUs()),
                 this.blankToNull(request.whatsapp()),

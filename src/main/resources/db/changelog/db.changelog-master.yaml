@@ -56,3 +56,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/019-add-business-public-profile.yaml
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/020-add-business-category.yaml
+      relativeToChangelogFile: false

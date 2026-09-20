@@ -34,6 +34,7 @@ public final class PublicAvailabilityBusinessResponseBuilder {
         return new PublicAvailabilityBusinessResponse(
                 business.getId(),
                 business.getName(),
+                business.getCategory(),
                 business.getShortDescription(),
                 business.getSlug(),
                 business.isDepositEnabled(),

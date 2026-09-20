@@ -49,6 +49,7 @@ public class PublicBusinessPageService {
         return new PublicBusinessDetailResponse(
                 business.getId(),
                 business.getName(),
+                business.getCategory(),
                 business.getSlug(),
                 business.getShortDescription(),
                 business.getPublicDescription(),

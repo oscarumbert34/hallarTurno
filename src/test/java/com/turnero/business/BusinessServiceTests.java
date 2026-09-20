@@ -56,6 +56,7 @@ class BusinessServiceTests {
         assertThat(captor.getValue().getOwner().getId()).isEqualTo(ownerId);
         assertThat(response.slug()).isEqualTo("cafe-central-2");
         assertThat(response.name()).isEqualTo("Cafe Central");
+        assertThat(response.category()).isEqualTo(BusinessCategory.OTHERS);
         assertThat(response.status()).isEqualTo(BusinessStatus.ACTIVE);
     }
 

@@ -6,6 +6,7 @@ import java.util.UUID;
 public record PublicBusinessDetailResponse(
         UUID id,
         String name,
+        BusinessCategory category,
         String slug,
         String shortDescription,
         String publicDescription,

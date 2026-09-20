@@ -39,6 +39,10 @@ public class Business {
     @Column(nullable = false, length = 160)
     private String name;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 64)
+    private BusinessCategory category;
+
     @Column(name = "short_description", length = 500)
     private String shortDescription;
 
@@ -93,6 +97,7 @@ public class Business {
     private Business(
             User owner,
             String name,
+            BusinessCategory category,
             String shortDescription,
             String aboutUs,
             String whatsapp,
@@ -107,6 +112,7 @@ public class Business {
     ) {
         this.owner = owner;
         this.name = name;
+        this.category = category;
         this.shortDescription = shortDescription;
         this.aboutUs = aboutUs;
         this.whatsapp = whatsapp;
@@ -129,7 +135,8 @@ public class Business {
             String slug,
             BusinessStatus status
     ) {
-        return create(owner, name, shortDescription, null, null, null, null, null, phone, contactEmail, slug, status, false);
+        return create(owner, name, BusinessCategory.OTHERS, shortDescription, null, null, null, null, null,
+                phone, contactEmail, slug, status, false);
     }
 
     public static Business create(
@@ -142,12 +149,14 @@ public class Business {
             BusinessStatus status,
             boolean depositEnabled
     ) {
-        return create(owner, name, shortDescription, null, null, null, null, null, phone, contactEmail, slug, status, depositEnabled);
+        return create(owner, name, BusinessCategory.OTHERS, shortDescription, null, null, null, null, null,
+                phone, contactEmail, slug, status, depositEnabled);
     }
 
     public static Business create(
             User owner,
             String name,
+            BusinessCategory category,
             String shortDescription,
             String aboutUs,
             String whatsapp,
@@ -160,7 +169,7 @@ public class Business {
             BusinessStatus status,
             boolean depositEnabled
     ) {
-        return new Business(owner, name, shortDescription, aboutUs, whatsapp, instagram, logoImageKey,
+        return new Business(owner, name, category, shortDescription, aboutUs, whatsapp, instagram, logoImageKey,
                 coverImageKey, phone, contactEmail, slug, status, depositEnabled);
     }
 
@@ -177,6 +186,10 @@ public class Business {
 
     public String getName() {
         return name;
+    }
+
+    public BusinessCategory getCategory() {
+        return category;
     }
 
     public String getShortDescription() {
@@ -227,10 +240,11 @@ public class Business {
         return updatedAt;
     }
 
-    public void updateDetails(String name, String shortDescription, String aboutUs, String whatsapp,
+    public void updateDetails(String name, BusinessCategory category, String shortDescription, String aboutUs, String whatsapp,
                               String instagram, String logoImageKey, String coverImageKey,
                               String phone, String contactEmail) {
         this.name = name;
+        this.category = category;
         this.shortDescription = shortDescription;
         this.aboutUs = aboutUs;
         this.whatsapp = whatsapp;

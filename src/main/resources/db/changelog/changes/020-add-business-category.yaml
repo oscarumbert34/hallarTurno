@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - changeSet:
+      id: 020-add-business-category
+      author: turnero
+      comment: Add a controlled category to businesses and classify existing records as OTHERS.
+      changes:
+        - addColumn:
+            tableName: businesses
+            columns:
+              - column:
+                  name: category
+                  type: varchar(64)
+                  defaultValue: OTHERS
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: businesses
+            indexName: idx_businesses_category
+            columns:
+              - column:
+                  name: category
+        - sql:
+            sql: ALTER TABLE businesses ADD CONSTRAINT chk_businesses_category CHECK (category IN ('BARBERSHOP', 'HAIRDRESSER', 'BEAUTY', 'HEALTH', 'FITNESS', 'PROFESSIONAL_SERVICES', 'OTHERS'))
