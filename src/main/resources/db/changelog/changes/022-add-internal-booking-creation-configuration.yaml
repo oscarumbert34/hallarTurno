@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 022-add-internal-booking-creation-configuration
+      author: turnero
+      comment: Configure whether bookings can only be created internally.
+      changes:
+        - addColumn:
+            tableName: business_configurations
+            columns:
+              - column:
+                  name: internal_booking_creation
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropColumn:
+            tableName: business_configurations
+            columnName: internal_booking_creation

@@ -26,11 +26,13 @@ class PublicBusinessPageServiceTests {
     private final BusinessRepository businessRepository = mock(BusinessRepository.class);
     private final BranchRepository branchRepository = mock(BranchRepository.class);
     private final ServiceOfferingRepository serviceOfferingRepository = mock(ServiceOfferingRepository.class);
+    private final BusinessConfigurationRepository configurationRepository = mock(BusinessConfigurationRepository.class);
     private final ObjectStorageService storageService = mock(ObjectStorageService.class);
     private final PublicBusinessPageService service = new PublicBusinessPageService(
             businessRepository,
             branchRepository,
             serviceOfferingRepository,
+            configurationRepository,
             storageService
     );
 
@@ -48,6 +50,9 @@ class PublicBusinessPageServiceTests {
                 businessId, ServiceOfferingStatus.ACTIVE)).thenReturn(List.of());
         when(storageService.signedGetUrl("business/logo.png")).thenReturn("https://signed/logo");
         when(storageService.signedGetUrl("business/cover.jpg")).thenReturn("https://signed/cover");
+        BusinessConfiguration configuration = BusinessConfiguration.createDefault(business);
+        configuration.updateInternalBookingCreation(true);
+        when(configurationRepository.findById(businessId)).thenReturn(Optional.of(configuration));
 
         PublicBusinessDetailResponse response = service.findBySlug("centro-piedica");
 
@@ -59,6 +64,7 @@ class PublicBusinessPageServiceTests {
         assertThat(response.instagram()).isEqualTo("@centropiedica");
         assertThat(response.logoUrl()).isEqualTo("https://signed/logo");
         assertThat(response.coverImageUrl()).isEqualTo("https://signed/cover");
+        assertThat(response.internalBookingCreation()).isTrue();
         assertThat(response.branches()).singleElement().satisfies(publicBranch -> {
             assertThat(publicBranch.id()).isEqualTo(branchId);
             assertThat(publicBranch.city()).isEqualTo("Los Polvorines");

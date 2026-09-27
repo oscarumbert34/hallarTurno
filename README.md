@@ -306,7 +306,7 @@ Endpoints protegidos de negocios:
 - `PUT /api/v1/businesses/{id}/configuration`
 - `DELETE /api/v1/businesses/{id}`
 
-Cada negocio tiene una configuracion protegida para features del panel. Actualmente expone `weeklyBookingCopyEnabled`, que indica si el front debe mostrar la accion de copiar una semana de reservas y tambien habilita el endpoint `copy-week` en backend.
+Cada negocio tiene una configuracion protegida para features del panel. Expone `weeklyBookingCopyEnabled`, que indica si el front debe mostrar la accion de copiar una semana de reservas y tambien habilita el endpoint `copy-week` en backend, e `internalBookingCreation`, que limita el alta de turnos al flujo autenticado. Los campos opcionales que no se envian conservan su valor actual.
 
 Ejemplo de lectura de configuracion:
 
@@ -319,7 +319,10 @@ Respuesta:
 ```json
 {
   "businessId": "8778f5cf-83e8-41fb-9043-83e67673650a",
-  "weeklyBookingCopyEnabled": true
+  "weeklyBookingCopyEnabled": true,
+  "depositEnabled": false,
+  "appointmentConfirmationEnabled": false,
+  "internalBookingCreation": true
 }
 ```
 
@@ -331,7 +334,8 @@ PUT /api/v1/businesses/{businessId}/configuration
 
 ```json
 {
-  "weeklyBookingCopyEnabled": true
+  "weeklyBookingCopyEnabled": true,
+  "internalBookingCreation": true
 }
 ```
 
@@ -437,7 +441,7 @@ La reprogramacion conserva la reserva y sus snapshots historicos, acepta `resour
 
 ### Senas de reservas
 
-Los negocios exponen `depositEnabled`, con valor inicial `false`, tanto en sus DTOs como en `GET/PUT /api/v1/businesses/{businessId}/configuration`. Al crear una reserva se puede enviar `depositPaid`. Si las senas estan deshabilitadas, la reserva queda en `NOT_REQUIRED`; si estan habilitadas queda en `PENDING` por defecto o en `PAID` cuando `depositPaid` es `true`. Todas las respuestas de reservas incluyen `depositStatus`.
+Los negocios exponen `depositEnabled`, con valor inicial `false`, tanto en sus DTOs como en `GET/PUT /api/v1/businesses/{businessId}/configuration`. La misma configuracion incluye `internalBookingCreation`: cuando vale `true`, la empresa solo admite altas de turnos mediante el endpoint autenticado y `POST /api/v1/public/bookings` responde `403`; el perfil publico expone el campo para que el front pueda ocultar el flujo de reserva. Al crear una reserva se puede enviar `depositPaid`. Si las senas estan deshabilitadas, la reserva queda en `NOT_REQUIRED`; si estan habilitadas queda en `PENDING` por defecto o en `PAID` cuando `depositPaid` es `true`. Todas las respuestas de reservas incluyen `depositStatus`.
 
 El owner del negocio o un `ADMIN` puede cambiar una sena habilitada mediante `PATCH /api/v1/bookings/{bookingId}/deposit-status`, enviando `{"depositStatus":"PAID"}` o `{"depositStatus":"PENDING"}`. `NOT_REQUIRED` se asigna automaticamente solo cuando el negocio no utiliza senas.
 

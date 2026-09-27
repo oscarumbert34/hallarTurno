@@ -77,6 +77,29 @@ class BookingControllerIntegrationTests {
     }
 
     @Test
+    void publicBookingIsRejectedWhenBusinessOnlyAllowsInternalCreation() throws Exception {
+        Fixture fixture = fixture("booking-internal-only");
+        mockMvc.perform(put("/api/v1/businesses/" + fixture.businessId() + "/configuration")
+                        .header("Authorization", "Bearer " + fixture.ownerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "weeklyBookingCopyEnabled": false,
+                                  "internalBookingCreation": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.internalBookingCreation").value(true));
+
+        mockMvc.perform(post("/api/v1/public/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(publicBookingJsonWithEmail(fixture, "09:00")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message")
+                        .value("This business only allows internal booking creation"));
+    }
+
+    @Test
     void firstPublicBookingRequiresCustomerEmail() throws Exception {
         Fixture fixture = fixture("booking-public-email-required");
 

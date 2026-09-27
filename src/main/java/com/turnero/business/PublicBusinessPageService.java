@@ -19,17 +19,20 @@ public class PublicBusinessPageService {
     private final BusinessRepository businessRepository;
     private final BranchRepository branchRepository;
     private final ServiceOfferingRepository serviceOfferingRepository;
+    private final BusinessConfigurationRepository configurationRepository;
     private final ObjectStorageService storageService;
 
     public PublicBusinessPageService(
             final BusinessRepository businessRepository,
             final BranchRepository branchRepository,
             final ServiceOfferingRepository serviceOfferingRepository,
+            final BusinessConfigurationRepository configurationRepository,
             final ObjectStorageService storageService
     ) {
         this.businessRepository = businessRepository;
         this.branchRepository = branchRepository;
         this.serviceOfferingRepository = serviceOfferingRepository;
+        this.configurationRepository = configurationRepository;
         this.storageService = storageService;
     }
 
@@ -46,6 +49,9 @@ public class PublicBusinessPageService {
                 .stream()
                 .map(PublicBranchServiceResponse::from)
                 .toList();
+        final boolean internalBookingCreation = this.configurationRepository.findById(business.getId())
+                .map(BusinessConfiguration::isInternalBookingCreation)
+                .orElse(false);
         return new PublicBusinessDetailResponse(
                 business.getId(),
                 business.getName(),
@@ -61,6 +67,7 @@ public class PublicBusinessPageService {
                 business.getPhone(),
                 business.getContactEmail(),
                 business.isDepositEnabled(),
+                internalBookingCreation,
                 branches,
                 services
         );

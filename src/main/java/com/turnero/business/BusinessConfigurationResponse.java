@@ -6,7 +6,8 @@ public record BusinessConfigurationResponse(
         UUID businessId,
         boolean weeklyBookingCopyEnabled,
         boolean depositEnabled,
-        boolean appointmentConfirmationEnabled
+        boolean appointmentConfirmationEnabled,
+        boolean internalBookingCreation
 ) {
 
     static BusinessConfigurationResponse from(BusinessConfiguration configuration) {
@@ -14,7 +15,8 @@ public record BusinessConfigurationResponse(
                 configuration.getBusiness().getId(),
                 configuration.isWeeklyBookingCopyEnabled(),
                 configuration.getBusiness().isDepositEnabled(),
-                configuration.isAppointmentConfirmationEnabled()
+                configuration.isAppointmentConfirmationEnabled(),
+                configuration.isInternalBookingCreation()
         );
     }
 }

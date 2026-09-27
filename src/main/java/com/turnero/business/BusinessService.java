@@ -129,6 +129,9 @@ public class BusinessService {
         if (request.appointmentConfirmationEnabled() != null) {
             configuration.updateAppointmentConfirmationEnabled(request.appointmentConfirmationEnabled());
         }
+        if (request.internalBookingCreation() != null) {
+            configuration.updateInternalBookingCreation(request.internalBookingCreation());
+        }
         if (request.depositEnabled() != null) {
             business.updateDepositEnabled(request.depositEnabled());
         }
