@@ -6,13 +6,14 @@ public record BusinessConfigurationRequest(
         @NotNull
         Boolean weeklyBookingCopyEnabled,
         Boolean depositEnabled,
-        Boolean appointmentConfirmationEnabled
+        Boolean appointmentConfirmationEnabled,
+        Boolean internalBookingCreation
 ) {
     public BusinessConfigurationRequest(Boolean weeklyBookingCopyEnabled) {
-        this(weeklyBookingCopyEnabled, null, null);
+        this(weeklyBookingCopyEnabled, null, null, null);
     }
 
     public BusinessConfigurationRequest(Boolean weeklyBookingCopyEnabled, Boolean depositEnabled) {
-        this(weeklyBookingCopyEnabled, depositEnabled, null);
+        this(weeklyBookingCopyEnabled, depositEnabled, null, null);
     }
 }

@@ -18,6 +18,7 @@ public record PublicBusinessDetailResponse(
         String phone,
         String email,
         boolean depositEnabled,
+        boolean internalBookingCreation,
         List<PublicBusinessBranchResponse> branches,
         List<PublicBranchServiceResponse> services
 ) {

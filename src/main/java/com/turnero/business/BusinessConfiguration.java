@@ -32,6 +32,9 @@ public class BusinessConfiguration {
     @Column(name = "appointment_confirmation_enabled", nullable = false)
     private boolean appointmentConfirmationEnabled;
 
+    @Column(name = "internal_booking_creation", nullable = false)
+    private boolean internalBookingCreation;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -43,14 +46,20 @@ public class BusinessConfiguration {
     protected BusinessConfiguration() {
     }
 
-    private BusinessConfiguration(Business business, boolean weeklyBookingCopyEnabled, boolean appointmentConfirmationEnabled) {
+    private BusinessConfiguration(
+            Business business,
+            boolean weeklyBookingCopyEnabled,
+            boolean appointmentConfirmationEnabled,
+            boolean internalBookingCreation
+    ) {
         this.business = business;
         this.weeklyBookingCopyEnabled = weeklyBookingCopyEnabled;
         this.appointmentConfirmationEnabled = appointmentConfirmationEnabled;
+        this.internalBookingCreation = internalBookingCreation;
     }
 
     public static BusinessConfiguration createDefault(Business business) {
-        return new BusinessConfiguration(business, false, false);
+        return new BusinessConfiguration(business, false, false, false);
     }
 
     public UUID getBusinessId() {
@@ -69,6 +78,10 @@ public class BusinessConfiguration {
         return appointmentConfirmationEnabled;
     }
 
+    public boolean isInternalBookingCreation() {
+        return internalBookingCreation;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -83,5 +96,9 @@ public class BusinessConfiguration {
 
     public void updateAppointmentConfirmationEnabled(boolean appointmentConfirmationEnabled) {
         this.appointmentConfirmationEnabled = appointmentConfirmationEnabled;
+    }
+
+    public void updateInternalBookingCreation(boolean internalBookingCreation) {
+        this.internalBookingCreation = internalBookingCreation;
     }
 }

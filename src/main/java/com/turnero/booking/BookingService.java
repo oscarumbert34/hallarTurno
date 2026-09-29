@@ -114,17 +114,22 @@ public class BookingService {
     public BookingResponse create(BookingRequest request, AuthenticatedUser currentUser) {
         User customer = userRepository.findById(currentUser.id())
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Authenticated user was not found"));
-        return createBooking(request, customer);
+        return createBooking(request, customer, false);
     }
 
     @Transactional
     public BookingResponse createPublic(BookingRequest request) {
-        return createBooking(request, null);
+        return createBooking(request, null, true);
     }
 
-    private BookingResponse createBooking(BookingRequest request, User customer) {
+    private BookingResponse createBooking(BookingRequest request, User customer, boolean publicCreation) {
         Branch branch = branchRepository.findById(request.branchId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Branch not found"));
+        if (publicCreation && businessConfigurationRepository.findById(branch.getBusiness().getId())
+                .map(BusinessConfiguration::isInternalBookingCreation)
+                .orElse(false)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "This business only allows internal booking creation");
+        }
         ServiceOffering serviceOffering = serviceOfferingRepository.findById(request.serviceOfferingId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Service offering not found"));
         BookableResource resource = resourceRepository.findById(request.resourceId())
