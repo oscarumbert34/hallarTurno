@@ -1,0 +1,78 @@
+databaseChangeLog:
+  - changeSet:
+      id: 023-create-email-commercial-model
+      author: codex
+      changes:
+        - createTable:
+            tableName: business_email_subscriptions
+            columns:
+              - column: { name: business_id, type: uuid, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: base_plan, type: varchar(32), defaultValue: BASIC, constraints: { nullable: false } }
+              - column: { name: addon, type: varchar(32), defaultValue: NONE, constraints: { nullable: false } }
+              - column: { name: pending_addon, type: varchar(32) }
+              - column: { name: status, type: varchar(32), defaultValue: ACTIVE, constraints: { nullable: false } }
+              - column: { name: period_started_at, type: timestamp with time zone, constraints: { nullable: false } }
+              - column: { name: period_ends_at, type: timestamp with time zone, constraints: { nullable: false } }
+              - column: { name: trial_started_at, type: timestamp with time zone }
+              - column: { name: trial_ends_at, type: timestamp with time zone }
+              - column: { name: explicit_selection, type: boolean, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: confirmation_enabled, type: boolean, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: daily_agenda_enabled, type: boolean, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: reminder_action_enabled, type: boolean, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: cancellation_enabled, type: boolean, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: created_at, type: timestamp with time zone, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column: { name: updated_at, type: timestamp with time zone, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            baseTableName: business_email_subscriptions
+            baseColumnNames: business_id
+            constraintName: fk_email_subscription_business
+            referencedTableName: businesses
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - sql:
+            sql: |
+              INSERT INTO business_email_subscriptions
+                (business_id, base_plan, addon, status, period_started_at, period_ends_at,
+                 confirmation_enabled, daily_agenda_enabled, reminder_action_enabled, cancellation_enabled)
+              SELECT id, 'BASIC', 'NONE', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '1 month',
+                     false, false, false, false
+              FROM businesses;
+        - createTable:
+            tableName: email_delivery_attempts
+            columns:
+              - column: { name: id, type: uuid, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: business_id, type: uuid, constraints: { nullable: false } }
+              - column: { name: email_type, type: varchar(64), constraints: { nullable: false } }
+              - column: { name: status, type: varchar(32), constraints: { nullable: false } }
+              - column: { name: quota_source, type: varchar(32) }
+              - column: { name: booking_id, type: uuid }
+              - column: { name: idempotency_key, type: varchar(255), constraints: { nullable: false } }
+              - column: { name: provider_id, type: varchar(255) }
+              - column: { name: omission_reason, type: varchar(64) }
+              - column: { name: request_id, type: varchar(128) }
+              - column: { name: occurred_at, type: timestamp with time zone, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            baseTableName: email_delivery_attempts
+            baseColumnNames: business_id
+            constraintName: fk_email_attempt_business
+            referencedTableName: businesses
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: email_delivery_attempts
+            columnNames: business_id,idempotency_key
+            constraintName: uk_email_attempt_business_key
+        - createIndex:
+            tableName: email_delivery_attempts
+            indexName: idx_email_attempt_business_period
+            columns:
+              - column: { name: business_id }
+              - column: { name: occurred_at }
+        - createIndex:
+            tableName: email_delivery_attempts
+            indexName: idx_email_attempt_status
+            columns:
+              - column: { name: status }
+      rollback:
+        - dropTable: { tableName: email_delivery_attempts }
+        - dropTable: { tableName: business_email_subscriptions }

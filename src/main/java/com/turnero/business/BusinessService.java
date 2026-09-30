@@ -2,15 +2,20 @@ package com.turnero.business;
 
 import com.turnero.auth.AuthenticatedUser;
 import com.turnero.common.ApiException;
+import com.turnero.email.policy.BusinessEmailSubscription;
+import com.turnero.email.policy.BusinessEmailSubscriptionRepository;
 import com.turnero.security.OwnershipGuard;
 import com.turnero.user.User;
 import com.turnero.user.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.Clock;
+import java.time.Instant;
 
 @Service
 public class BusinessService {
@@ -21,14 +26,19 @@ public class BusinessService {
     private final BusinessProperties properties;
     private final SlugGenerator slugGenerator;
     private final OwnershipGuard ownershipGuard;
+    private final BusinessEmailSubscriptionRepository emailSubscriptionRepository;
+    private final Clock clock;
 
+    @Autowired
     public BusinessService(
             final BusinessRepository businessRepository,
             final BusinessConfigurationRepository configurationRepository,
             final UserRepository userRepository,
             final BusinessProperties properties,
             final SlugGenerator slugGenerator,
-            final OwnershipGuard ownershipGuard
+            final OwnershipGuard ownershipGuard,
+            final BusinessEmailSubscriptionRepository emailSubscriptionRepository,
+            final Clock clock
     ) {
         this.businessRepository = businessRepository;
         this.configurationRepository = configurationRepository;
@@ -36,6 +46,16 @@ public class BusinessService {
         this.properties = properties;
         this.slugGenerator = slugGenerator;
         this.ownershipGuard = ownershipGuard;
+        this.emailSubscriptionRepository = emailSubscriptionRepository;
+        this.clock = clock;
+    }
+
+    BusinessService(final BusinessRepository businessRepository,
+            final BusinessConfigurationRepository configurationRepository,
+            final UserRepository userRepository, final BusinessProperties properties,
+            final SlugGenerator slugGenerator, final OwnershipGuard ownershipGuard) {
+        this(businessRepository, configurationRepository, userRepository, properties, slugGenerator,
+                ownershipGuard, null, Clock.systemUTC());
     }
 
     @Transactional
@@ -62,6 +82,9 @@ public class BusinessService {
         );
         final Business saved = this.businessRepository.saveAndFlush(business);
         this.configurationRepository.saveAndFlush(BusinessConfiguration.createDefault(saved));
+        if (this.emailSubscriptionRepository != null) {
+            this.emailSubscriptionRepository.saveAndFlush(BusinessEmailSubscription.trial(saved, Instant.now(this.clock)));
+        }
         return BusinessResponse.from(saved);
     }
 

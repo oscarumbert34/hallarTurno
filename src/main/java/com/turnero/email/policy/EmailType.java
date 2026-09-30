@@ -1,0 +1,9 @@
+package com.turnero.email.policy;
+
+public enum EmailType {
+    BOOKING_CONFIRMATION,
+    BOOKING_RESCHEDULE,
+    BUSINESS_DAILY_AGENDA,
+    BOOKING_REMINDER_ACTION,
+    BUSINESS_CANCELLATION
+}

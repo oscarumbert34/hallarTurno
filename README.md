@@ -599,3 +599,27 @@ Pruebas incluidas:
 - Tests de reservas para creacion, cancelacion por cliente/negocio, bloqueo a terceros, slot invalido y doble booking concurrente.
 - Tests de marketplace publico para busqueda anonima, filtros, agrupacion, inactivos, servicios sin disponibilidad y proteccion del resto de endpoints.
 
+# MVP de correos (backend)
+
+El backend persiste por negocio el plan base (`BASIC`, `GROWTH`, `PRO`), el complemento
+(`NONE`, `ESSENTIAL`, `COMPLETE`), el período mensual, el trial y las preferencias de cada
+automatización. Las altas nuevas reciben un trial de 30 días de Pro + Complete; al vencer,
+si no hubo una selección explícita, vuelven a Basic + None sin borrar sus preferencias.
+
+Endpoints autenticados (solo owner o admin):
+
+- `GET /api/v1/businesses/{businessId}/emails`: estado, automatizaciones y medidores.
+- `PUT /api/v1/businesses/{businessId}/emails/preferences`: cambia preferencias sin alterar el complemento.
+- `PUT /api/v1/businesses/{businessId}/emails/addon`: upgrade inmediato o downgrade al siguiente período.
+
+Todos los envíos de reserva, reprogramación, recordatorio/acción, agenda del día siguiente y
+cancelación pasan por `EmailEntitlementService`. Solo una aceptación del proveedor consume
+cupo; omisiones y fallos quedan en `email_delivery_attempts` sin cuerpo ni destinatario. Las
+claves de idempotencia evitan duplicados. El job de trials corre una vez por día, a las 03:15 UTC
+(00:15 de Argentina), y puede configurarse con `email.trial-expiration-cron`. Para rollback, revertir
+el changeset 023; elimina únicamente
+las tablas nuevas del módulo de correos.
+
+Decisiones del MVP codificadas: reprogramación se incluye en Essential como confirmación y la
+agenda diaria corresponde al día siguiente. Growth dispone de 30 agendas mensuales separadas
+del cupo del complemento.
