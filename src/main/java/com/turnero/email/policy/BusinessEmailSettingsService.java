@@ -14,11 +14,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@ConditionalOnBean(name = "entityManagerFactory")
 public class BusinessEmailSettingsService {
     private static final Logger log = LoggerFactory.getLogger(BusinessEmailSettingsService.class);
     private final BusinessRepository businesses;

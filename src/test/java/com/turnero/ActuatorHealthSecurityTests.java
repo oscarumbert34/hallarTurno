@@ -11,6 +11,7 @@ import com.turnero.business.BusinessPublicProfileService;
 import com.turnero.business.PublicBusinessPageService;
 import com.turnero.customer.CustomerContactService;
 import com.turnero.employee.BookableResourceService;
+import com.turnero.email.policy.BusinessEmailSettingsService;
 import com.turnero.marketplace.PublicAvailabilityService;
 import com.turnero.service.ServiceOfferingService;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -79,6 +81,9 @@ class ActuatorHealthSecurityTests {
 
     @MockBean
     private CustomerContactService customerContactService;
+
+    @MockBean
+    private BusinessEmailSettingsService businessEmailSettingsService;
 
     private final MockMvc mockMvc;
 
@@ -142,6 +147,20 @@ class ActuatorHealthSecurityTests {
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.triggered").value(true));
         verify(this.bookingReminderService).sendDueReminders();
+    }
+
+    @Test
+    void emailSettingsControllerIsRegistered() throws Exception {
+        var businessId = java.util.UUID.randomUUID();
+        when(this.businessEmailSettingsService.get(org.mockito.ArgumentMatchers.eq(businessId),
+                org.mockito.ArgumentMatchers.nullable(com.turnero.auth.AuthenticatedUser.class))).thenReturn(null);
+
+        this.mockMvc.perform(get("/api/v1/businesses/" + businessId + "/emails")
+                        .with(user("business").roles("BUSINESS")))
+                .andExpect(status().isOk());
+
+        verify(this.businessEmailSettingsService).get(org.mockito.ArgumentMatchers.eq(businessId),
+                org.mockito.ArgumentMatchers.nullable(com.turnero.auth.AuthenticatedUser.class));
     }
 
 }

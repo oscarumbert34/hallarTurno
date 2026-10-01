@@ -5,10 +5,8 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 
 @RestController
-@ConditionalOnBean(name = "entityManagerFactory")
 @RequestMapping("/api/v1/businesses/{businessId}/emails")
 public class BusinessEmailController {
     private final BusinessEmailSettingsService service;

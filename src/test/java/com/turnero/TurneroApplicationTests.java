@@ -10,6 +10,7 @@ import com.turnero.business.BusinessPublicProfileService;
 import com.turnero.business.PublicBusinessPageService;
 import com.turnero.customer.CustomerContactService;
 import com.turnero.employee.BookableResourceService;
+import com.turnero.email.policy.BusinessEmailSettingsService;
 import com.turnero.marketplace.PublicAvailabilityService;
 import com.turnero.service.ServiceOfferingService;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,9 @@ class TurneroApplicationTests {
 
     @MockBean
     private CustomerContactService customerContactService;
+
+    @MockBean
+    private BusinessEmailSettingsService businessEmailSettingsService;
 
     @Test
     void contextLoads() {
