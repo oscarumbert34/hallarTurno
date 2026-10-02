@@ -623,3 +623,27 @@ las tablas nuevas del módulo de correos.
 Decisiones del MVP codificadas: reprogramación se incluye en Essential como confirmación y la
 agenda diaria corresponde al día siguiente. Growth dispone de 30 agendas mensuales separadas
 del cupo del complemento.
+
+### Consumo sintético para E2E
+
+El perfil `e2e` (siempre que `prod` no esté activo) habilita este endpoint autenticado para owner
+o admin:
+
+- `PUT /api/v1/testing/businesses/{businessId}/email-usage`
+- `POST /api/v1/testing/bookings/{bookingId}/action-token`
+
+Payload: `{"addonUsed": 1040, "growthAgendaUsed": 0}`. Reemplaza únicamente intentos
+sintéticos del fixture y devuelve el mismo estado que `GET .../emails`. No llama al proveedor ni
+guarda destinatarios. Nunca elimina intentos reales y responde `409` si el valor solicitado es
+menor que el consumo real aceptado.
+
+El segundo endpoint exige autenticación y propiedad del negocio, reemplaza el token de acción
+existente de la reserva y devuelve uno nuevo. Permite probar confirmación y cancelación sin
+contactar al proveedor de correo. Ninguno de los endpoints se registra con el perfil `prod`.
+
+Para iniciar el backend local destinado a Playwright:
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE='e2e'
+mvn spring-boot:run
+```

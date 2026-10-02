@@ -14,6 +14,8 @@ public interface BookingActionTokenRepository extends JpaRepository<BookingActio
     @EntityGraph(attributePaths = {"booking", "booking.business", "booking.branch"})
     Optional<BookingActionToken> findByTokenHash(String tokenHash);
 
+    Optional<BookingActionToken> findByBookingId(UUID bookingId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select token from BookingActionToken token join fetch token.booking booking " +
             "join fetch booking.business join fetch booking.branch where token.tokenHash = :tokenHash")
