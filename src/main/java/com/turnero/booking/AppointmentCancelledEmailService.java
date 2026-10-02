@@ -1,12 +1,16 @@
 package com.turnero.booking;
 
 import com.turnero.email.BrevoTransactionalEmailClient;
+import com.turnero.email.policy.EmailDeliveryService;
+import com.turnero.email.policy.EmailType;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.util.HtmlUtils;
@@ -20,9 +24,18 @@ public class AppointmentCancelledEmailService {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     private final BrevoTransactionalEmailClient emailClient;
+    private final EmailDeliveryService deliveryService;
+    private final BookingRepository bookingRepository;
 
     public AppointmentCancelledEmailService(BrevoTransactionalEmailClient emailClient) {
-        this.emailClient = emailClient;
+        this.emailClient = emailClient; this.deliveryService = null; this.bookingRepository = null;
+    }
+
+    @Autowired
+    public AppointmentCancelledEmailService(BrevoTransactionalEmailClient emailClient,
+            ObjectProvider<EmailDeliveryService> deliveryService, ObjectProvider<BookingRepository> bookingRepository) {
+        this.emailClient = emailClient; this.deliveryService = deliveryService.getIfAvailable();
+        this.bookingRepository = bookingRepository.getIfAvailable();
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
@@ -33,7 +46,7 @@ public class AppointmentCancelledEmailService {
         }
         LocalDateTime startsAt = LocalDateTime.ofInstant(event.startsAt(), ZoneId.of(event.zoneId()));
         try {
-            boolean sent = emailClient.sendEmail(
+            java.util.function.BooleanSupplier call = () -> emailClient.sendEmail(
                     event.recipientEmail(),
                     event.recipientName(),
                     "Turno cancelado - %s %s".formatted(
@@ -43,6 +56,15 @@ public class AppointmentCancelledEmailService {
                     plainTextContent(event, startsAt),
                     htmlContent(event, startsAt)
             );
+            boolean sent;
+            if (deliveryService == null || bookingRepository == null) {
+                sent = call.getAsBoolean();
+            } else {
+                sent = bookingRepository.findById(event.bookingId())
+                        .map(booking -> deliveryService.deliver(booking.getBusiness(), EmailType.BUSINESS_CANCELLATION,
+                                booking.getId(), "cancellation:" + booking.getId(), call))
+                        .orElse(false);
+            }
             if (sent) {
                 log.info("appointment cancellation email sent bookingId={} recipientEmail={}",
                         event.bookingId(), event.recipientEmail());

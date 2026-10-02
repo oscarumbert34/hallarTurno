@@ -2,12 +2,16 @@ package com.turnero.booking;
 
 import com.turnero.business.Business;
 import com.turnero.email.BrevoTransactionalEmailClient;
+import com.turnero.email.policy.EmailDeliveryService;
+import com.turnero.email.policy.EmailType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.util.HtmlUtils;
 
 @Service
@@ -17,9 +21,15 @@ public class BusinessAgendaEmailService {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     private final BrevoTransactionalEmailClient emailClient;
+    private final EmailDeliveryService deliveryService;
 
     public BusinessAgendaEmailService(BrevoTransactionalEmailClient emailClient) {
-        this.emailClient = emailClient;
+        this.emailClient = emailClient; this.deliveryService = null;
+    }
+
+    @Autowired
+    public BusinessAgendaEmailService(BrevoTransactionalEmailClient emailClient, ObjectProvider<EmailDeliveryService> deliveryService) {
+        this.emailClient = emailClient; this.deliveryService = deliveryService.getIfAvailable();
     }
 
     boolean sendAgenda(LocalDate agendaDate, List<Booking> bookings) {
@@ -34,14 +44,14 @@ public class BusinessAgendaEmailService {
         if (recipientEmail == null || recipientEmail.isBlank()) {
             return false;
         }
-        return emailClient.sendEmail(
-                recipientEmail,
-                business.getName(),
-                "Agenda de mañana - %s (%d turnos)".formatted(
+        final String finalRecipientEmail = recipientEmail;
+        final java.util.function.BooleanSupplier call = () -> emailClient.sendEmail(finalRecipientEmail,
+                business.getName(), "Agenda de mañana - %s (%d turnos)".formatted(
                         agendaDate.format(DATE_FORMATTER), bookings.size()),
-                plainTextContent(agendaDate, business, bookings),
-                htmlContent(agendaDate, business, bookings)
-        );
+                plainTextContent(agendaDate, business, bookings), htmlContent(agendaDate, business, bookings));
+        return deliveryService == null ? call.getAsBoolean() : deliveryService.deliver(
+                business, EmailType.BUSINESS_DAILY_AGENDA, null,
+                "agenda:" + business.getId() + ":" + agendaDate, call);
     }
 
     private String plainTextContent(LocalDate date, Business business, List<Booking> bookings) {

@@ -1,6 +1,8 @@
 package com.turnero.booking;
 
 import com.turnero.email.BrevoTransactionalEmailClient;
+import com.turnero.email.policy.EmailDeliveryService;
+import com.turnero.email.policy.EmailType;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -8,6 +10,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.util.HtmlUtils;
 
 @Service
@@ -18,12 +22,19 @@ public class BookingConfirmationEmailService {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     private final BrevoTransactionalEmailClient emailClient;
+    private final EmailDeliveryService deliveryService;
 
     @Value("${app.frontend.base-url:https://hallarturno.com.ar}")
     private String frontendBaseUrl = "https://hallarturno.com.ar";
 
     public BookingConfirmationEmailService(final BrevoTransactionalEmailClient emailClient) {
-        this.emailClient = emailClient;
+        this.emailClient = emailClient; this.deliveryService = null;
+    }
+
+    @Autowired
+    public BookingConfirmationEmailService(final BrevoTransactionalEmailClient emailClient,
+            final ObjectProvider<EmailDeliveryService> deliveryService) {
+        this.emailClient = emailClient; this.deliveryService = deliveryService.getIfAvailable();
     }
 
     boolean sendConfirmation(final Booking booking) {
@@ -35,13 +46,12 @@ public class BookingConfirmationEmailService {
         if (email == null || email.isBlank()) {
             return false;
         }
-        final boolean sent = this.emailClient.sendEmail(
-                email,
-                booking.getCustomerNameSnapshot(),
-                "Confirmacion de tu turno en HallarTurno",
-                this.plainTextContent(booking, actionToken),
-                this.htmlContent(booking, actionToken)
-        );
+        final java.util.function.BooleanSupplier call = () -> this.emailClient.sendEmail(email,
+                booking.getCustomerNameSnapshot(), "Confirmacion de tu turno en HallarTurno",
+                this.plainTextContent(booking, actionToken), this.htmlContent(booking, actionToken));
+        final boolean sent = deliveryService == null ? call.getAsBoolean() : deliveryService.deliver(
+                booking.getBusiness(), EmailType.BOOKING_CONFIRMATION, booking.getId(),
+                "confirmation:" + booking.getId(), call);
         if (sent) {
             log.info("booking confirmation email sent bookingId={} recipientEmail={}", booking.getId(), email);
         }
@@ -53,13 +63,12 @@ public class BookingConfirmationEmailService {
         if (email == null || email.isBlank()) {
             return;
         }
-        if (this.emailClient.sendEmail(
-                email,
-                booking.getCustomerNameSnapshot(),
-                "Reprogramacion de tu turno en HallarTurno",
-                this.reschedulePlainTextContent(booking),
-                this.rescheduleHtmlContent(booking)
-        )) {
+        final java.util.function.BooleanSupplier call = () -> this.emailClient.sendEmail(email,
+                booking.getCustomerNameSnapshot(), "Reprogramacion de tu turno en HallarTurno",
+                this.reschedulePlainTextContent(booking), this.rescheduleHtmlContent(booking));
+        if (deliveryService == null ? call.getAsBoolean() : deliveryService.deliver(
+                booking.getBusiness(), EmailType.BOOKING_RESCHEDULE, booking.getId(),
+                "reschedule:" + booking.getId() + ":" + booking.getStartsAt(), call)) {
             log.info("booking reschedule email sent bookingId={} recipientEmail={}", booking.getId(), email);
         }
     }

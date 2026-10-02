@@ -36,10 +36,11 @@ class BusinessAgendaServiceTests {
         Booking first = booking(firstBusiness);
         Booking second = booking(firstBusiness);
         Booking third = booking(secondBusiness);
-        when(bookingRepository.findBusinessAgendaCandidates(
+        when(bookingRepository.findEntitledBusinessAgendaCandidates(
                 Set.of(BookingStatus.CONFIRMED, BookingStatus.PENDING_CONFIRMATION),
                 Instant.parse("2026-09-08T03:00:00Z"),
-                Instant.parse("2026-09-09T03:00:00Z")
+                Instant.parse("2026-09-09T03:00:00Z"),
+                Instant.parse("2026-09-07T21:00:00Z")
         )).thenReturn(List.of(first, second, third));
 
         service.sendTomorrowAgendas();
@@ -54,8 +55,8 @@ class BusinessAgendaServiceTests {
 
         service.sendTomorrowAgendas();
 
-        verify(bookingRepository, never()).findBusinessAgendaCandidates(
-                org.mockito.Mockito.any(), org.mockito.Mockito.any(), org.mockito.Mockito.any());
+        verify(bookingRepository, never()).findEntitledBusinessAgendaCandidates(
+                org.mockito.Mockito.any(), org.mockito.Mockito.any(), org.mockito.Mockito.any(), org.mockito.Mockito.any());
     }
 
     private Business business() {

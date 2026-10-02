@@ -1,10 +1,14 @@
 package com.turnero.booking;
 
 import com.turnero.email.BrevoTransactionalEmailClient;
+import com.turnero.email.policy.EmailDeliveryService;
+import com.turnero.email.policy.EmailType;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.util.HtmlUtils;
 
 @Service
@@ -14,9 +18,16 @@ public class BookingReminderEmailService {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     private final BrevoTransactionalEmailClient emailClient;
+    private final EmailDeliveryService deliveryService;
 
     public BookingReminderEmailService(final BrevoTransactionalEmailClient emailClient) {
-        this.emailClient = emailClient;
+        this.emailClient = emailClient; this.deliveryService = null;
+    }
+
+    @Autowired
+    public BookingReminderEmailService(final BrevoTransactionalEmailClient emailClient,
+            final ObjectProvider<EmailDeliveryService> deliveryService) {
+        this.emailClient = emailClient; this.deliveryService = deliveryService.getIfAvailable();
     }
 
     boolean sendReminder(final Booking booking) {
@@ -24,13 +35,12 @@ public class BookingReminderEmailService {
         if (email == null || email.isBlank()) {
             return false;
         }
-        return this.emailClient.sendEmail(
-                email,
-                booking.getCustomerNameSnapshot(),
-                "Recordatorio de tu turno en HallarTurno",
-                this.plainTextContent(booking),
-                this.htmlContent(booking)
-        );
+        final java.util.function.BooleanSupplier call = () -> this.emailClient.sendEmail(email,
+                booking.getCustomerNameSnapshot(), "Recordatorio de tu turno en HallarTurno",
+                this.plainTextContent(booking), this.htmlContent(booking));
+        return deliveryService == null ? call.getAsBoolean() : deliveryService.deliver(
+                booking.getBusiness(), EmailType.BOOKING_REMINDER_ACTION, booking.getId(),
+                "reminder:" + booking.getId() + ":" + booking.getStartsAt(), call);
     }
 
     private String plainTextContent(final Booking booking) {

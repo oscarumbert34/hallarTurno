@@ -54,8 +54,8 @@ public class BusinessAgendaService {
         LocalDate agendaDate = LocalDate.now(clock.withZone(zoneId)).plusDays(1);
         Instant from = agendaDate.atStartOfDay(zoneId).toInstant();
         Instant to = agendaDate.plusDays(1).atStartOfDay(zoneId).toInstant();
-        List<Booking> bookings = bookingRepository.findBusinessAgendaCandidates(
-                Set.of(BookingStatus.CONFIRMED, BookingStatus.PENDING_CONFIRMATION), from, to);
+        List<Booking> bookings = bookingRepository.findEntitledBusinessAgendaCandidates(
+                Set.of(BookingStatus.CONFIRMED, BookingStatus.PENDING_CONFIRMATION), from, to, Instant.now(clock));
 
         Map<UUID, List<Booking>> byBusiness = new LinkedHashMap<>();
         for (Booking booking : bookings) {

@@ -191,4 +191,24 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             @Param("startsAtFrom") Instant startsAtFrom,
             @Param("startsAtTo") Instant startsAtTo
     );
+
+    @EntityGraph(attributePaths = {"business", "business.owner", "branch", "serviceOffering", "resource"})
+    @Query("""
+            select booking from Booking booking
+            where booking.status in :statuses
+              and booking.startsAt >= :startsAtFrom and booking.startsAt < :startsAtTo
+              and exists (select subscription.businessId from BusinessEmailSubscription subscription
+                  where subscription.business = booking.business
+                    and subscription.dailyAgendaEnabled = true
+                    and (subscription.basePlan = com.turnero.email.policy.BasePlan.GROWTH
+                      or subscription.addon in (com.turnero.email.policy.EmailAddon.ESSENTIAL, com.turnero.email.policy.EmailAddon.COMPLETE)
+                      or (subscription.status = com.turnero.email.policy.SubscriptionStatus.TRIAL and subscription.trialEndsAt > :now)))
+            order by booking.business.id asc, booking.startsAt asc, booking.id asc
+            """)
+    List<Booking> findEntitledBusinessAgendaCandidates(
+            @Param("statuses") Collection<BookingStatus> statuses,
+            @Param("startsAtFrom") Instant startsAtFrom,
+            @Param("startsAtTo") Instant startsAtTo,
+            @Param("now") Instant now
+    );
 }
